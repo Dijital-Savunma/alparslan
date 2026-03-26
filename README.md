@@ -1,7 +1,7 @@
 # Alparslan
 
 [![Lisans: MIT](https://img.shields.io/badge/Lisans-MIT-blue?style=flat-square)](LICENSE)
-[![Turna Vakfı](https://img.shields.io/badge/Turna_Vakfı-Açık_Kaynak-red?style=flat-square)](https://github.com/DijitalSavunma)
+[![Turna Vakfı](https://img.shields.io/badge/Turna_Vakfı-Açık_Kaynak-red?style=flat-square)](https://github.com/Dijital-Savunma)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Web_Store-yellow?style=flat-square)](#)
 [![Firefox Add-ons](https://img.shields.io/badge/Firefox-Add--ons-orange?style=flat-square)](#)
 
@@ -41,7 +41,7 @@ Chrome Web Store'da "Alparslan" arayın ve "Ekle" butonuna tıklayın.
 ### Geliştirici Modu (Manuel)
 ```bash
 # Repoyu klonla
-git clone https://github.com/DijitalSavunma/alparslan.git
+git clone https://github.com/Dijital-Savunma/alparslan.git
 cd alparslan
 
 # Bağımlılıkları yükle
@@ -85,7 +85,7 @@ Tüm kontroller **istemci taraflıdır** — gezinme veriniz sunuculara gönderi
 
 ## Katkıda Bulunma
 
-Katkılarınızı bekliyoruz! [Katkı rehberimizi](https://github.com/DijitalSavunma/.github/blob/main/CONTRIBUTING.md) inceleyin.
+Katkılarınızı bekliyoruz! [Katkı rehberimizi](https://github.com/Dijital-Savunma/.github/blob/main/CONTRIBUTING.md) inceleyin.
 
 Özellikle şu alanlarda katkıya ihtiyacımız var:
 - Türkiye'ye özgü phishing sitelerinin raporlanması
