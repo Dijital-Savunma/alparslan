@@ -107,13 +107,49 @@ export function levenshteinDistance(a: string, b: string): number {
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1, // deletion
+        dp[i][j - 1] + 1, // insertion
+        dp[i - 1][j - 1] + cost, // substitution
+      );
+
+      // Damerau extension: transposition of two adjacent characters costs 1
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        dp[i][j] = Math.min(dp[i][j], dp[i - 2][j - 2] + cost);
+      }
     }
   }
   return dp[m][n];
+}
+
+// Common unicode confusables: Cyrillic/Greek lookalikes → Latin equivalents
+const CONFUSABLES: Record<string, string> = {
+  "\u0430": "a", // Cyrillic а
+  "\u0435": "e", // Cyrillic е
+  "\u043E": "o", // Cyrillic о
+  "\u0440": "p", // Cyrillic р
+  "\u0441": "c", // Cyrillic с
+  "\u0443": "y", // Cyrillic у
+  "\u0445": "x", // Cyrillic х
+  "\u0456": "i", // Cyrillic і
+  "\u0261": "g", // Latin small script g
+  "\u03B1": "a", // Greek α
+  "\u03BF": "o", // Greek ο
+  "\u03B5": "e", // Greek ε
+  "\u0131": "i", // Turkish dotless ı
+};
+
+export function normalizeHomoglyphs(input: string): string {
+  let result = "";
+  for (const char of input) {
+    result += CONFUSABLES[char] ?? char;
+  }
+  return result;
+}
+
+function stripSeparators(name: string): string {
+  return name.replace(/[-_.]/g, "");
 }
 
 function extractName(rootDomain: string): string {
@@ -121,15 +157,23 @@ function extractName(rootDomain: string): string {
   return rootDomain.split(".")[0];
 }
 
-export function checkTyposquatting(domain: string): { isSuspicious: boolean; similarTo: string | null } {
+export function checkTyposquatting(
+  domain: string,
+): { isSuspicious: boolean; similarTo: string | null; reason: string | null } {
   const root = extractRootDomain(domain);
 
   // If the domain itself is trusted, no typosquatting
   if (TRUSTED_DOMAINS.has(root)) {
-    return { isSuspicious: false, similarTo: null };
+    return { isSuspicious: false, similarTo: null, reason: null };
   }
 
-  const name = extractName(root);
+  const rawName = extractName(root);
+  const normalizedName = normalizeHomoglyphs(rawName);
+  const strippedName = stripSeparators(normalizedName);
+
+  // Check all subdomain parts for trusted name hiding (e.g. garanti.evil.com)
+  const subdomainParts = domain.split(".");
+  const allParts = subdomainParts.length > 2 ? subdomainParts.slice(0, -2) : [];
 
   for (const trusted of TRUSTED_DOMAINS) {
     const trustedRoot = extractRootDomain(trusted);
@@ -137,13 +181,61 @@ export function checkTyposquatting(domain: string): { isSuspicious: boolean; sim
 
     if (root === trustedRoot) continue;
 
-    const distance = levenshteinDistance(name, trustedName);
-    // If very similar but not identical, it's suspicious
+    // Skip very short trusted names (≤2 chars) to avoid false positives
+    if (trustedName.length <= 2) continue;
+
+    // Check 1: Same name but different TLD (turkiye.com vs turkiye.gov.tr)
+    if (normalizedName === trustedName || strippedName === trustedName) {
+      return {
+        isSuspicious: true,
+        similarTo: trusted,
+        reason: "tld-mismatch",
+      };
+    }
+
+    // Check 2: Damerau-Levenshtein distance ≤ 2 (classic typosquatting)
+    const distance = levenshteinDistance(strippedName, trustedName);
     if (distance > 0 && distance <= 2) {
-      return { isSuspicious: true, similarTo: trusted };
+      return {
+        isSuspicious: true,
+        similarTo: trusted,
+        reason: "edit-distance",
+      };
+    }
+
+    // Check 3: Trusted name contained as substring (securegaranti.com.tr)
+    // Only for names long enough to avoid false positives (≥5 chars)
+    if (trustedName.length >= 5 && strippedName.length > trustedName.length) {
+      if (strippedName.includes(trustedName)) {
+        return {
+          isSuspicious: true,
+          similarTo: trusted,
+          reason: "contains-trusted-name",
+        };
+      }
+    }
+
+    // Check 4: Subdomain hiding (garanti.evil.com, isbank.phishing.net)
+    for (const part of allParts) {
+      const normalizedPart = normalizeHomoglyphs(part);
+      if (normalizedPart === trustedName) {
+        return {
+          isSuspicious: true,
+          similarTo: trusted,
+          reason: "subdomain-impersonation",
+        };
+      }
+      const partDistance = levenshteinDistance(normalizedPart, trustedName);
+      if (trustedName.length >= 4 && partDistance > 0 && partDistance <= 2) {
+        return {
+          isSuspicious: true,
+          similarTo: trusted,
+          reason: "subdomain-typosquat",
+        };
+      }
     }
   }
-  return { isSuspicious: false, similarTo: null };
+  return { isSuspicious: false, similarTo: null, reason: null };
 }
 
 export function checkUrl(
@@ -185,8 +277,16 @@ export function checkUrl(
   // Medium + High: typosquatting check
   const typo = checkTyposquatting(domain);
   if (typo.isSuspicious) {
-    score += 70;
-    reasons.push(`${typo.similarTo} ile benzer domain (olasi sahte site)`);
+    const reasonLabels: Record<string, { score: number; text: string }> = {
+      "edit-distance": { score: 70, text: "benzer domain (olasi sahte site)" },
+      "tld-mismatch": { score: 60, text: "ayni isim farkli uzanti (olasi sahte site)" },
+      "contains-trusted-name": { score: 50, text: "guvenilir ismi iceriyor (olasi sahte site)" },
+      "subdomain-impersonation": { score: 65, text: "alt alan adinda guvenilir isim (olasi sahte site)" },
+      "subdomain-typosquat": { score: 55, text: "alt alan adinda benzer isim (olasi sahte site)" },
+    };
+    const match = reasonLabels[typo.reason ?? ""] ?? { score: 70, text: "benzer domain" };
+    score += match.score;
+    reasons.push(`${typo.similarTo} ile ${match.text}`);
   }
 
   // Medium + High: suspicious keyword check
