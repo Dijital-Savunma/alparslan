@@ -1,7 +1,7 @@
 # Alparslan
 
 [![Lisans: MIT](https://img.shields.io/badge/Lisans-MIT-blue?style=flat-square)](LICENSE)
-[![Turna Vakfı](https://img.shields.io/badge/Turna_Vakfı-Açık_Kaynak-red?style=flat-square)](https://github.com/Dijital-Savunma)
+[![Dijital Savunma](https://img.shields.io/badge/Dijital_Savunma-Açık_Kaynak-red?style=flat-square)](https://github.com/Dijital-Savunma)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Web_Store-yellow?style=flat-square)](#)
 [![Firefox Add-ons](https://img.shields.io/badge/Firefox-Add--ons-orange?style=flat-square)](#)
 
@@ -96,4 +96,4 @@ Katkılarınızı bekliyoruz! [Katkı rehberimizi](https://github.com/Dijital-Sa
 
 ## Lisans
 
-MIT Lisansı — [Turna Vakfı](https://turnavakfi.org)
+MIT Lisansı — [Dijital Savunma](https://dijitalsavunma.org)
