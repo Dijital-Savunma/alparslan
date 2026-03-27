@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Alparslan",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "Phishing ve dolandırıcılığa karşı güvenli tarayıcı eklentisi",
+    "description": "Extension description"
+  }
+}
