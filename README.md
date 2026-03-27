@@ -27,11 +27,13 @@ Adını Anadolu'nun kapılarını açan Sultan Alparslan'dan alır — dijital d
 
 ## Desteklenen Tarayıcılar
 
-- Google Chrome / Chromium
-- Mozilla Firefox
-- Microsoft Edge
-- Brave
-- Opera
+| Tarayıcı | Manifest | Durum |
+|-----------|----------|-------|
+| Google Chrome / Chromium | v3 | Destekleniyor |
+| Mozilla Firefox | v2 | Destekleniyor |
+| Microsoft Edge | v3 | Destekleniyor |
+| Brave | v3 | Destekleniyor |
+| Opera | v3 | Destekleniyor |
 
 ## Kurulum
 
@@ -47,41 +49,90 @@ cd alparslan
 # Bağımlılıkları yükle
 npm install
 
-# Build
+# Chrome için build
 npm run build
+
+# Firefox için build
+npm run build:firefox
 
 # Chrome'da:
 # 1. chrome://extensions adresine gidin
 # 2. "Geliştirici modu"nu açın
 # 3. "Paketlenmemiş öğe yükle" ile dist/ klasörünü seçin
+
+# Firefox'ta:
+# 1. about:debugging#/runtime/this-firefox adresine gidin
+# 2. "Geçici Eklenti Yükle" ile dist-firefox/manifest.json dosyasını seçin
 ```
+
+### Paketleme
+```bash
+# Chrome .zip paketi
+npm run package
+
+# Firefox .zip paketi
+npm run package:firefox
+```
+
+## Teknik Altyapı
+
+- **Dil:** TypeScript
+- **UI:** React 18
+- **Build:** Vite 5
+- **Test:** Vitest
+- **Lint:** ESLint + Prettier
 
 ## Mimari
 
 ```
 alparslan/
 ├── src/
-│   ├── background/       ← Arka plan servisi
+│   ├── background/       ← Service worker (Chrome MV3) / Background script (Firefox MV2)
 │   ├── content/          ← Sayfa içi scriptler
-│   ├── popup/            ← Eklenti popup arayüzü
+│   ├── popup/            ← Eklenti popup arayüzü (React)
+│   ├── options/          ← Ayarlar sayfası (React)
 │   ├── detector/         ← Phishing ve tehdit algılama motoru
-│   ├── blocklist/        ← Engelleme listeleri
+│   │   ├── url-checker   ← URL analizi
+│   │   └── page-analyzer ← Sayfa içerik analizi
+│   ├── blocklist/        ← Engelleme listeleri ve uzak güncelleme
 │   ├── privacy/          ← İzleyici engelleme modülü
-│   └── utils/            ← Yardımcı fonksiyonlar
-├── lists/                ← Türkiye odaklı tehdit listeleri
-├── tests/                ← Test dosyaları
-├── manifest.json         ← WebExtension manifest (v3)
-└── docs/                 ← Dokümantasyon
+│   └── utils/            ← Yardımcı fonksiyonlar ve tarayıcı uyumluluk katmanı
+├── lists/                ← Türkiye odaklı tehdit listeleri (tr-phishing.json)
+├── icons/                ← Eklenti ikonları (16, 48, 128px)
+├── tests/                ← Test dosyaları (birim testler)
+├── manifest.json         ← Chrome Manifest V3
+├── manifest.firefox.json ← Firefox Manifest V2
+├── vite.config.ts        ← Build yapılandırması (Chrome + Firefox)
+└── vitest.config.ts      ← Test yapılandırması
 ```
 
 ## Tehdit Tespiti Nasıl Çalışır?
 
 1. **URL Analizi** — Ziyaret edilen URL'ler, bilinen tehdit veritabanıyla karşılaştırılır
 2. **Sayfa İçerik Analizi** — Sayfa içeriği phishing kalıplarına karşı taranır
-3. **Görsel Benzerlik** — Sahte sitelerin orijinal sitelere benzerliği tespit edilir
+3. **Engelleme Listesi Güncelleme** — Tehdit listeleri uzak sunucudan periyodik olarak güncellenir
 4. **Topluluk Bildirimi** — Kullanıcılar şüpheli siteleri bildirebilir
 
 Tüm kontroller **istemci taraflıdır** — gezinme veriniz sunuculara gönderilmez.
+
+## Geliştirme
+
+```bash
+# Geliştirme (watch modu)
+npm run dev
+
+# Testleri çalıştır
+npm test
+
+# Testleri izle
+npm run test:watch
+
+# Lint
+npm run lint
+
+# Format
+npm run format
+```
 
 ## Katkıda Bulunma
 
