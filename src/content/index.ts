@@ -1,5 +1,5 @@
 // Alparslan - Content Script
-import "@/utils/browser-polyfill";
+// Not: browser-polyfill import edilmez — content script'te chrome zaten mevcut
 import { analyzePage } from "@/detector/page-analyzer";
 
 const BANNER_HOST_ID = "alparslan-warning-host";
@@ -86,6 +86,8 @@ function escapeHtml(text: string): string {
 // Run page analysis after DOM is ready
 function runPageAnalysis(): void {
   try {
+    if (!chrome.runtime?.id) return; // extension context invalidated
+
     const domain = window.location.hostname;
     const result = analyzePage(document, domain);
 
@@ -95,7 +97,7 @@ function runPageAnalysis(): void {
         domain,
         url: window.location.href,
         ...result,
-      });
+      }).catch(() => {});
     }
   } catch {
     // Silently fail - don't break the page
@@ -114,9 +116,9 @@ chrome.runtime.onMessage.addListener(
 
 // Analyze page content after load
 if (document.readyState === "complete") {
-  runPageAnalysis();
+  setTimeout(runPageAnalysis, 500);
 } else {
-  window.addEventListener("load", runPageAnalysis);
+  window.addEventListener("load", () => setTimeout(runPageAnalysis, 500));
 }
 
 export {};
