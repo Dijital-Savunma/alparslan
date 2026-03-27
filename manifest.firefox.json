@@ -1,0 +1,49 @@
+{
+  "manifest_version": 2,
+  "name": "__MSG_extensionName__",
+  "version": "0.1.0",
+  "description": "__MSG_extensionDescription__",
+  "default_locale": "tr",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png"
+    },
+    "default_title": "Alparslan"
+  },
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "alarms",
+    "<all_urls>"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "web_accessible_resources": ["lists/*"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "alparslan@dijitalsavunma.org",
+      "strict_min_version": "109.0"
+    }
+  }
+}
