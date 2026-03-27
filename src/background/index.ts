@@ -215,9 +215,24 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
+const BADGE_CONFIG: Record<string, { text: string; color: string }> = {
+  SAFE: { text: "\u2713", color: "#16a34a" },
+  DANGEROUS: { text: "!", color: "#dc2626" },
+  SUSPICIOUS: { text: "?", color: "#d97706" },
+  UNKNOWN: { text: "", color: "#6b7280" },
+};
+
+function updateBadge(tabId: number, level: string): void {
+  const badge = BADGE_CONFIG[level] || BADGE_CONFIG.UNKNOWN;
+  chrome.action.setBadgeText({ text: badge.text, tabId });
+  chrome.action.setBadgeBackgroundColor({ color: badge.color, tabId });
+}
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
   if (changeInfo.url && state.enabled) {
     const result = checkUrl(changeInfo.url, state.settings.protectionLevel);
+
+    updateBadge(tabId, result.level);
 
     if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
       chrome.tabs

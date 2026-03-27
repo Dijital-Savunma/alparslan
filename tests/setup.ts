@@ -23,6 +23,10 @@ const chromeMock = {
     create: () => {},
     onAlarm: { addListener: () => {} },
   },
+  action: {
+    setBadgeText: () => {},
+    setBadgeBackgroundColor: () => {},
+  },
 };
 
 Object.defineProperty(globalThis, "chrome", {

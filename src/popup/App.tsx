@@ -153,7 +153,7 @@ export default function App() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 20 }}>{"\uD83D\uDEE1\uFE0F"}</span>
+          <img src="/icons/icon-48.png" alt="Alparslan" style={{ width: 24, height: 24 }} />
           <span style={{ fontWeight: 700, fontSize: 16 }}>Alparslan</span>
         </div>
         <label

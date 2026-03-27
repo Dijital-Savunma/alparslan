@@ -60,6 +60,10 @@ Object.defineProperty(globalThis, "chrome", {
       create: vi.fn(),
       onAlarm: { addListener: vi.fn() },
     },
+    action: {
+      setBadgeText: vi.fn(),
+      setBadgeBackgroundColor: vi.fn(),
+    },
   },
   writable: true,
 });
