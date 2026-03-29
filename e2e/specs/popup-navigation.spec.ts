@@ -4,7 +4,7 @@ import { openPopup } from "../helpers/extension-page";
 test.describe("Popup Navigation", () => {
   test("should show header with Alparslan branding", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
-    await expect(popup.getByText("Alparslan")).toBeVisible();
+    await expect(popup.getByText("Alparslan").first()).toBeVisible();
     await popup.close();
   });
 
@@ -46,7 +46,9 @@ test.describe("Popup Navigation", () => {
 
   test("negative: should show disabled state when toggled off", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
-    await popup.getByText("Aktif").click();
+    // Click the toggle track div (width: 36px, inside the header label)
+    const toggleTrack = popup.locator('label div[style*="width: 36px"]');
+    await toggleTrack.click();
     await expect(popup.getByText("Pasif")).toBeVisible();
     await expect(popup.getByText("Koruma Kapali")).toBeVisible();
     await popup.close();
