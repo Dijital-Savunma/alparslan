@@ -14,13 +14,18 @@
     "lint": "eslint src/",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "package": "npm run build && cd dist && zip -r ../alparslan-chrome.zip . && cd ..",
-    "package:firefox": "npm run build:firefox && cd dist-firefox && zip -r ../alparslan-firefox.zip . && cd .."
+    "package:firefox": "npm run build:firefox && cd dist-firefox && zip -r ../alparslan-firefox.zip . && cd ..",
+    "test:e2e": "npx playwright test --config e2e/playwright.config.ts",
+    "test:e2e:headed": "npx playwright test --config e2e/playwright.config.ts --headed",
+    "test:e2e:debug": "npx playwright test --config e2e/playwright.config.ts --debug",
+    "test:e2e:report": "npx playwright show-report"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/chrome": "^0.0.268",
