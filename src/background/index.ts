@@ -4,6 +4,11 @@ import { type Message, type ExtensionSettings, type ExtensionStats, type SiteRep
 import type { PageAnalysisResult } from "@/detector/page-analyzer";
 import { checkUrl, loadBlocklist, extractDomain } from "@/detector/url-checker";
 import { fetchRemoteBlocklist, submitReport, scheduleListUpdates } from "@/blocklist/updater";
+import { checkBreach, loadBreachDatabase as loadBreachDB } from "@/breach/checker";
+import { fetchRemoteBreachDatabase } from "@/breach/updater";
+import { collectCurrentWeekMetrics, collectPreviousWeekMetrics, recordPageProtocol, recordThreatVisit } from "@/dashboard/metrics-collector";
+import { calculateScore } from "@/dashboard/score-calculator";
+import type { BreachEntry } from "@/breach/types";
 
 interface ExtensionState {
   enabled: boolean;
@@ -74,6 +79,20 @@ chrome.runtime.onInstalled.addListener(() => {
 
   // Try an immediate remote fetch (merges with built-in list)
   fetchRemoteBlocklist();
+
+  // Load built-in breach database
+  fetch(chrome.runtime.getURL("lists/breached-sites.json"))
+    .then((r) => r.json())
+    .then((data: { breaches: BreachEntry[] }) => {
+      loadBreachDB(data.breaches);
+      console.warn("[Alparslan] Loaded " + String(data.breaches.length) + " breach entries");
+    })
+    .catch(() => {
+      console.warn("[Alparslan] Could not load breach database");
+    });
+
+  // Try immediate remote breach fetch
+  fetchRemoteBreachDatabase();
 });
 
 chrome.runtime.onMessage.addListener(
@@ -102,6 +121,7 @@ chrome.runtime.onMessage.addListener(
       const result = checkUrl(message.url as string, state.settings.protectionLevel);
       if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
         state.stats.threatsBlocked++;
+        recordThreatVisit(result.level);
       }
       persistStats();
       addHistoryEntry(url, result.level, result.score);
@@ -211,6 +231,31 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
+    if (message.type === "CHECK_BREACH") {
+      const domain = message.domain as string;
+      const result = checkBreach(domain);
+      sendResponse(result);
+      return true;
+    }
+
+    if (message.type === "GET_DASHBOARD_SCORE") {
+      (async () => {
+        const currentWeek = await collectCurrentWeekMetrics();
+        const previousWeek = await collectPreviousWeekMetrics();
+        const dashboard = calculateScore(currentWeek);
+        dashboard.previousWeek = previousWeek;
+        sendResponse({ dashboard });
+      })();
+      return true;
+    }
+
+    if (message.type === "RECORD_PROTOCOL") {
+      const url = message.url as string;
+      recordPageProtocol(url);
+      sendResponse({ ok: true });
+      return true;
+    }
+
     return false;
   },
 );
@@ -231,6 +276,7 @@ function updateBadge(tabId: number, level: string): void {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
   if (changeInfo.url && state.enabled) {
     const result = checkUrl(changeInfo.url, state.settings.protectionLevel);
+    recordPageProtocol(changeInfo.url);
 
     updateBadge(tabId, result.level);
 
