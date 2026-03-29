@@ -12,10 +12,12 @@ test.describe("Dashboard Score — Happy Path", () => {
   test("should show score breakdown categories", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByText("Skor").click();
-    await expect(popup.getByText("HTTPS")).toBeVisible();
-    await expect(popup.getByText("Tehdit")).toBeVisible();
+    // Wait for dashboard to load (loading state shows "Yukleniyor...")
+    await expect(popup.getByText("Haftalik Guvenlik Skoru")).toBeVisible({ timeout: 10000 });
+    await expect(popup.getByText("HTTPS").first()).toBeVisible();
+    await expect(popup.getByText("Tehdit").first()).toBeVisible();
     await expect(popup.getByText("Aktivite")).toBeVisible();
-    await expect(popup.getByText("Tracker")).toBeVisible();
+    await expect(popup.getByText("Tracker").first()).toBeVisible();
     await popup.close();
   });
 
