@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { DEFAULT_SETTINGS, type ExtensionSettings } from "@/utils/types";
+import type { DashboardData } from "@/dashboard/types";
 
 type ProtectionLevel = ExtensionSettings["protectionLevel"];
 
@@ -14,6 +15,7 @@ export default function Options() {
   const [newDomain, setNewDomain] = useState("");
   const [saved, setSaved] = useState(false);
   const [cleared, setCleared] = useState(false);
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
 
   useEffect(() => {
     chrome.storage.sync.get(["settings"], (result) => {
@@ -21,6 +23,14 @@ export default function Options() {
         setSettings({ ...DEFAULT_SETTINGS, ...(result.settings as ExtensionSettings) });
       }
     });
+    chrome.runtime.sendMessage(
+      { type: "GET_DASHBOARD_SCORE" },
+      (response: { dashboard: DashboardData } | null) => {
+        if (response?.dashboard) {
+          setDashboard(response.dashboard);
+        }
+      },
+    );
   }, []);
 
   const saveSettings = useCallback((updated: ExtensionSettings) => {
@@ -71,6 +81,52 @@ export default function Options() {
           </p>
         </div>
       </div>
+
+      {/* Security Score Summary */}
+      {dashboard && (
+        <Section title="Haftalik Guvenlik Ozeti">
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                border: "3px solid " + (dashboard.score >= 80 ? "#16a34a" : dashboard.score >= 50 ? "#d97706" : "#dc2626"),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 24,
+                fontWeight: 700,
+                color: dashboard.score >= 80 ? "#16a34a" : dashboard.score >= 50 ? "#d97706" : "#dc2626",
+              }}
+            >
+              {dashboard.score}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                {dashboard.score >= 80
+                  ? "Harika! Guvenli geziniyorsunuz."
+                  : dashboard.score >= 50
+                    ? "Iyi, ama iyilestirme alani var."
+                    : "Dikkat! Guvenliginizi artirin."}
+              </div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                Bu hafta {dashboard.currentWeek.urlsChecked} sayfa kontrol edildi
+              </div>
+            </div>
+          </div>
+          {dashboard.tips.length > 0 && (
+            <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>Oneriler</div>
+              {dashboard.tips.map((tip, i) => (
+                <div key={i} style={{ fontSize: 12, color: "#78350f", padding: "3px 0" }}>
+                  * {tip}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
 
       {/* Saved notification */}
       {saved && (

@@ -1,0 +1,25 @@
+{
+  "version": "2026-03-29",
+  "breaches": [
+    { "domain": "linkedin.com", "name": "LinkedIn 2021", "date": "2021-06", "accountsAffected": 700000000, "dataTypes": ["email", "isim", "telefon"] },
+    { "domain": "facebook.com", "name": "Facebook 2021", "date": "2021-04", "accountsAffected": 533000000, "dataTypes": ["email", "telefon", "konum"] },
+    { "domain": "twitter.com", "name": "Twitter 2023", "date": "2023-01", "accountsAffected": 200000000, "dataTypes": ["email"] },
+    { "domain": "adobe.com", "name": "Adobe 2013", "date": "2013-10", "accountsAffected": 153000000, "dataTypes": ["email", "sifre", "kredi karti"] },
+    { "domain": "canva.com", "name": "Canva 2019", "date": "2019-05", "accountsAffected": 137000000, "dataTypes": ["email", "isim", "sifre"] },
+    { "domain": "myspace.com", "name": "MySpace 2016", "date": "2016-05", "accountsAffected": 360000000, "dataTypes": ["email", "sifre"] },
+    { "domain": "dropbox.com", "name": "Dropbox 2012", "date": "2012-07", "accountsAffected": 68000000, "dataTypes": ["email", "sifre"] },
+    { "domain": "tumblr.com", "name": "Tumblr 2013", "date": "2013-02", "accountsAffected": 65000000, "dataTypes": ["email", "sifre"] },
+    { "domain": "yahoo.com", "name": "Yahoo 2013-2014", "date": "2014-12", "accountsAffected": 3000000000, "dataTypes": ["email", "sifre", "guvenlik sorulari"] },
+    { "domain": "zynga.com", "name": "Zynga 2019", "date": "2019-09", "accountsAffected": 170000000, "dataTypes": ["email", "sifre", "kullanici adi"] },
+    { "domain": "last.fm", "name": "Last.fm 2012", "date": "2012-03", "accountsAffected": 43000000, "dataTypes": ["email", "sifre"] },
+    { "domain": "dubsmash.com", "name": "Dubsmash 2018", "date": "2018-12", "accountsAffected": 162000000, "dataTypes": ["email", "sifre"] },
+    { "domain": "spotify.com", "name": "Spotify 2020", "date": "2020-11", "accountsAffected": 350000, "dataTypes": ["email", "sifre"] },
+    { "domain": "yemeksepeti.com", "name": "Yemeksepeti 2021", "date": "2021-03", "accountsAffected": 21000000, "dataTypes": ["email", "telefon", "adres"] },
+    { "domain": "trendyol.com", "name": "Trendyol (iddia)", "date": "2022-06", "accountsAffected": 0, "dataTypes": ["email", "adres"] },
+    { "domain": "twitch.tv", "name": "Twitch 2021", "date": "2021-10", "accountsAffected": 0, "dataTypes": ["kaynak kodu", "kazanc verileri"] },
+    { "domain": "t-mobile.com", "name": "T-Mobile 2021", "date": "2021-08", "accountsAffected": 77000000, "dataTypes": ["isim", "SSN", "ehliyet"] },
+    { "domain": "marriott.com", "name": "Marriott 2018", "date": "2018-11", "accountsAffected": 500000000, "dataTypes": ["isim", "pasaport", "kredi karti"] },
+    { "domain": "epicgames.com", "name": "Epic Games 2019", "date": "2019-01", "accountsAffected": 0, "dataTypes": ["email", "sifre"] },
+    { "domain": "zoom.us", "name": "Zoom 2020", "date": "2020-04", "accountsAffected": 500000, "dataTypes": ["email", "sifre"] }
+  ]
+}
