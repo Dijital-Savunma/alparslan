@@ -9,3 +9,7 @@ dist-firefox/
 CLAUDE.md
 .claude/
 .planning/
+playwright-report
+test-results
+docs
+.idea

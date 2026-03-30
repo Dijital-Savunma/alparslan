@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import type { ThreatResult, ExtensionStats, ScanHistoryEntry } from "@/utils/types";
+import TabBar, { type TabId } from "./TabBar";
+import DashboardTab from "./DashboardTab";
+import BreachBadge from "./BreachBadge";
 
 type SecurityStatus = "safe" | "dangerous" | "suspicious" | "unknown" | "loading" | "disabled";
 
@@ -33,6 +36,7 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
   const [pageReasons, setPageReasons] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<TabId>("status");
 
   useEffect(() => {
     chrome.runtime.sendMessage({ type: "GET_STATS" }, (response: { stats: ExtensionStats } | null) => {
@@ -194,6 +198,12 @@ export default function App() {
         </label>
       </div>
 
+      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {activeTab === "dashboard" ? (
+        <DashboardTab />
+      ) : (
+      <>
       {/* Status */}
       <div
         style={{
@@ -269,6 +279,8 @@ export default function App() {
           </div>
         )}
       </div>
+
+      <BreachBadge domain={displayDomain} />
 
       {/* Stats */}
       <div
@@ -452,6 +464,8 @@ export default function App() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Footer */}
       <div

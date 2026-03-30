@@ -3,6 +3,7 @@
 import { analyzePage } from "@/detector/page-analyzer";
 
 const BANNER_HOST_ID = "alparslan-warning-host";
+const BREACH_BANNER_HOST_ID = "alparslan-breach-host";
 
 interface WarningMessage {
   type: "SHOW_WARNING";
@@ -83,6 +84,58 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
+function createBreachInfoBanner(reason: string): void {
+  const existing = document.getElementById(BREACH_BANNER_HOST_ID);
+  if (existing) existing.remove();
+
+  const host = document.createElement("div");
+  host.id = BREACH_BANNER_HOST_ID;
+  host.style.cssText = "all: initial; position: fixed; bottom: 0; left: 0; width: 100%; z-index: 2147483647;";
+
+  const shadow = host.attachShadow({ mode: "closed" });
+
+  const style = document.createElement("style");
+  style.textContent = [
+    ".breach-banner { font-family: system-ui, -apple-system, sans-serif; background: #1e40af; color: white; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; box-shadow: 0 -2px 8px rgba(0,0,0,0.2); animation: slideUp 0.3s ease-out; }",
+    ".breach-content { display: flex; align-items: center; gap: 10px; flex: 1; }",
+    ".breach-icon { font-size: 18px; }",
+    ".breach-close { background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }",
+    ".breach-close:hover { background: rgba(255,255,255,0.3); }",
+    "@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }",
+  ].join(" ");
+  shadow.appendChild(style);
+
+  const banner = document.createElement("div");
+  banner.className = "breach-banner";
+  banner.setAttribute("role", "status");
+
+  const content = document.createElement("div");
+  content.className = "breach-content";
+
+  const icon = document.createElement("span");
+  icon.className = "breach-icon";
+  icon.textContent = "\uD83D\uDD13";
+  content.appendChild(icon);
+
+  const text = document.createElement("div");
+  text.textContent = reason;
+  content.appendChild(text);
+
+  banner.appendChild(content);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "breach-close";
+  closeBtn.textContent = "Kapat";
+  closeBtn.addEventListener("click", () => host.remove());
+  banner.appendChild(closeBtn);
+
+  shadow.appendChild(banner);
+
+  if (document.body) {
+    document.body.appendChild(host);
+  }
+}
+
 // Run page analysis after DOM is ready
 function runPageAnalysis(): void {
   try {
@@ -99,6 +152,18 @@ function runPageAnalysis(): void {
         ...result,
       }).catch(() => {});
     }
+
+    // Check for breach history
+    chrome.runtime.sendMessage(
+      { type: "CHECK_BREACH", domain },
+      (response: { isBreached: boolean; breaches: { name: string; date: string; dataTypes: string[] }[] } | null) => {
+        if (response?.isBreached && response.breaches.length > 0) {
+          const breach = response.breaches[0];
+          const reason = "Bu site gecmiste veri sizintisina ugramis: " + breach.name + " (" + breach.date + "). Sizabilecek veriler: " + breach.dataTypes.join(", ");
+          createBreachInfoBanner(reason);
+        }
+      },
+    );
   } catch {
     // Silently fail - don't break the page
   }
