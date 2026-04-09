@@ -1,4 +1,85 @@
 import { ThreatLevel, type ThreatResult, type ExtensionSettings } from "@/utils/types";
+import { usomBloomTest } from "@/blocklist/usom-updater";
+import { hasDomain } from "@/blocklist/indexeddb-store";
+
+// ─── PUNYCODE DECODER (RFC 3492) ─────────────────────────────────
+// Chrome converts IDN domains to punycode (е-devlet.com → xn--devlet-2of.com).
+// We decode them back to Unicode so homoglyph detection can work.
+
+const BASE = 36;
+const TMIN = 1;
+const TMAX = 26;
+const SKEW = 38;
+const DAMP = 700;
+const INITIAL_BIAS = 72;
+const INITIAL_N = 128;
+
+function decodeDigit(cp: number): number {
+  if (cp >= 48 && cp <= 57) return cp - 22; // 0-9 → 26-35
+  if (cp >= 65 && cp <= 90) return cp - 65;  // A-Z → 0-25
+  if (cp >= 97 && cp <= 122) return cp - 97; // a-z → 0-25
+  return BASE;
+}
+
+function adapt(delta: number, numPoints: number, firstTime: boolean): number {
+  let d = firstTime ? Math.floor(delta / DAMP) : Math.floor(delta / 2);
+  d += Math.floor(d / numPoints);
+  let k = 0;
+  while (d > ((BASE - TMIN) * TMAX) / 2) {
+    d = Math.floor(d / (BASE - TMIN));
+    k += BASE;
+  }
+  return k + Math.floor(((BASE - TMIN + 1) * d) / (d + SKEW));
+}
+
+function decodePunycodeLabel(encoded: string): string {
+  const output: number[] = [];
+  let n = INITIAL_N;
+  let bias = INITIAL_BIAS;
+  let i = 0;
+
+  const delimIndex = encoded.lastIndexOf("-");
+  const basicLength = delimIndex < 0 ? 0 : delimIndex;
+
+  for (let j = 0; j < basicLength; j++) {
+    output.push(encoded.charCodeAt(j));
+  }
+
+  let inputPos = basicLength > 0 ? basicLength + 1 : 0;
+
+  while (inputPos < encoded.length) {
+    const oldi = i;
+    let w = 1;
+
+    for (let k = BASE; ; k += BASE) {
+      if (inputPos >= encoded.length) break;
+      const digit = decodeDigit(encoded.charCodeAt(inputPos++));
+      if (digit >= BASE) break;
+      i += digit * w;
+      const t = k <= bias ? TMIN : k >= bias + TMAX ? TMAX : k - bias;
+      if (digit < t) break;
+      w *= BASE - t;
+    }
+
+    const outLen = output.length + 1;
+    bias = adapt(i - oldi, outLen, oldi === 0);
+    n += Math.floor(i / outLen);
+    i %= outLen;
+    output.splice(i, 0, n);
+    i++;
+  }
+
+  return String.fromCodePoint(...output);
+}
+
+export function decodePunycodeDomain(domain: string): string {
+  return domain
+    .split(".")
+    .map((label) =>
+      label.startsWith("xn--") ? decodePunycodeLabel(label.slice(4)) : label,
+    )
+    .join(".");
+}
 
 // Well-known trusted domains — phishing targets in Turkey + major global sites
 const TRUSTED_DOMAINS = new Set([
@@ -46,6 +127,7 @@ const TRUSTED_DOMAINS = new Set([
   "telegram.org",
   "discord.com",
   // Global — email & cloud
+  "gmail.com",
   "microsoft.com",
   "live.com",
   "outlook.com",
@@ -186,7 +268,9 @@ function extractName(rootDomain: string): string {
 export function checkTyposquatting(
   domain: string,
 ): { isSuspicious: boolean; similarTo: string | null; reason: string | null } {
-  const root = extractRootDomain(domain);
+  // Decode punycode labels so homoglyph detection works on Unicode chars
+  const decoded = decodePunycodeDomain(domain);
+  const root = extractRootDomain(decoded);
 
   // If the domain itself is trusted, no typosquatting
   if (TRUSTED_DOMAINS.has(root)) {
@@ -198,7 +282,7 @@ export function checkTyposquatting(
   const strippedName = stripSeparators(normalizedName);
 
   // Check all subdomain parts for trusted name hiding (e.g. garanti.evil.com)
-  const subdomainParts = domain.split(".");
+  const subdomainParts = decoded.split(".");
   const allParts = subdomainParts.length > 2 ? subdomainParts.slice(0, -2) : [];
 
   for (const trusted of TRUSTED_DOMAINS) {
@@ -285,10 +369,17 @@ export function checkUrl(
   const reasons: string[] = [];
   let score = 0;
 
-  // Check blocklist (all levels)
+  // Check builtin blocklist (all levels)
   if (dangerousDomains.has(domain) || dangerousDomains.has(rootDomain)) {
     score = 100;
     reasons.push("Bilinen tehlikeli site");
+    return { level: ThreatLevel.DANGEROUS, score, reasons, url, checkedAt: now };
+  }
+
+  // Check USOM Bloom filter (sync, fast — "no" is definitive)
+  if (usomBloomTest(domain) || usomBloomTest(rootDomain)) {
+    score = 100;
+    reasons.push("USOM tehdit listesinde");
     return { level: ThreatLevel.DANGEROUS, score, reasons, url, checkedAt: now };
   }
 
@@ -353,4 +444,37 @@ export function checkUrl(
   }
 
   return { level, score, reasons, url, checkedAt: now };
+}
+
+/**
+ * Async version that confirms USOM Bloom filter hits against IndexedDB.
+ * Use this when you need zero false positives (e.g. before showing a warning).
+ */
+export async function checkUrlConfirmed(
+  url: string,
+  protectionLevel: ExtensionSettings["protectionLevel"] = "medium",
+): Promise<ThreatResult> {
+  const result = checkUrl(url, protectionLevel);
+
+  // If the sync check flagged it as USOM, confirm via IndexedDB
+  if (result.level === ThreatLevel.DANGEROUS && result.reasons.includes("USOM tehdit listesinde")) {
+    const domain = extractDomain(url);
+    if (domain) {
+      const rootDomain = extractRootDomain(domain);
+      const confirmed = await hasDomain(domain) || await hasDomain(rootDomain);
+      if (!confirmed) {
+        // Bloom filter false positive — re-run without USOM flag
+        // Remove the USOM reason and recalculate
+        const filteredReasons = result.reasons.filter((r) => r !== "USOM tehdit listesinde");
+        return {
+          ...result,
+          level: filteredReasons.length > 0 ? result.level : ThreatLevel.UNKNOWN,
+          score: filteredReasons.length > 0 ? result.score : 0,
+          reasons: filteredReasons,
+        };
+      }
+    }
+  }
+
+  return result;
 }

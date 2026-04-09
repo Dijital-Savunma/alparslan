@@ -16,6 +16,7 @@ import {
   checkUrl,
   loadBlocklist,
   normalizeHomoglyphs,
+  decodePunycodeDomain,
 } from "@/detector/url-checker";
 import { ThreatLevel } from "@/utils/types";
 
@@ -276,6 +277,48 @@ describe("e-devlet Cyrillic homoglyph attacks", () => {
     const result = checkTyposquatting("\u0435-de\u03BDlet.gov.tr");
     expect(result.isSuspicious).toBe(true);
     expect(result.similarTo).toBe("e-devlet.gov.tr");
+  });
+});
+
+// ─── PUNYCODE DECODING (IDN HOMOGLYPH ATTACKS) ──────────────────
+describe("Punycode decoding — Chrome IDN domains", () => {
+  it("decodePunycodeDomain decodes xn-- labels to Unicode", () => {
+    // "xn--devlet-2of" is punycode for "е-devlet" (Cyrillic е)
+    // We can verify by encoding: е (U+0435) in "е-devlet"
+    const decoded = decodePunycodeDomain("xn--devlet-2of.com");
+    expect(decoded).toContain("devlet");
+    // The decoded domain should contain a non-ASCII char (the Cyrillic е)
+    expect(decoded).not.toBe("devlet.com");
+  });
+
+  it("decodePunycodeDomain passes through normal domains unchanged", () => {
+    expect(decodePunycodeDomain("google.com")).toBe("google.com");
+    expect(decodePunycodeDomain("e-devlet.gov.tr")).toBe("e-devlet.gov.tr");
+    expect(decodePunycodeDomain("isbank.com.tr")).toBe("isbank.com.tr");
+  });
+
+  it("catches punycode e-devlet with Cyrillic е (xn--devlet-2of.com)", () => {
+    // Chrome shows: xn--devlet-2of.com (punycode for е-devlet.com with Cyrillic е)
+    const result = checkTyposquatting("xn--devlet-2of.com");
+    expect(result.isSuspicious).toBe(true);
+  });
+
+  it("catches punycode gmail with Cyrillic а (xn--gmil-63d.com)", () => {
+    // Chrome shows: xn--gmil-63d.com (punycode for gmаil.com with Cyrillic а)
+    const result = checkTyposquatting("xn--gmil-63d.com");
+    expect(result.isSuspicious).toBe(true);
+  });
+
+  it("catches punycode google with Cyrillic о (xn--ggle-0nda.com)", () => {
+    // "gооgle" with two Cyrillic о → punycode
+    const result = checkTyposquatting("xn--ggle-0nda.com");
+    expect(result.isSuspicious).toBe(true);
+  });
+
+  it("decodePunycodeDomain handles multiple xn-- labels", () => {
+    const decoded = decodePunycodeDomain("xn--devlet-2of.xn--trkiye-03a.gov.tr");
+    // Both labels should be decoded, not start with xn--
+    expect(decoded).not.toContain("xn--");
   });
 });
 
