@@ -280,6 +280,7 @@ export function checkTyposquatting(
   const rawName = extractName(root);
   const normalizedName = normalizeHomoglyphs(rawName);
   const strippedName = stripSeparators(normalizedName);
+  const hasHomoglyphs = rawName !== normalizedName || domain !== decoded;
 
   // Check all subdomain parts for trusted name hiding (e.g. garanti.evil.com)
   const subdomainParts = decoded.split(".");
@@ -288,35 +289,36 @@ export function checkTyposquatting(
   for (const trusted of TRUSTED_DOMAINS) {
     const trustedRoot = extractRootDomain(trusted);
     const trustedName = extractName(trustedRoot);
+    const strippedTrustedName = stripSeparators(trustedName);
 
     if (root === trustedRoot) continue;
 
     // Skip very short trusted names (≤2 chars) to avoid false positives
-    if (trustedName.length <= 2) continue;
+    if (strippedTrustedName.length <= 2) continue;
 
     // Check 1: Same name but different TLD (turkiye.com vs turkiye.gov.tr)
-    if (normalizedName === trustedName || strippedName === trustedName) {
+    if (normalizedName === trustedName || strippedName === strippedTrustedName) {
       return {
         isSuspicious: true,
         similarTo: trusted,
-        reason: "tld-mismatch",
+        reason: hasHomoglyphs ? "homoglyph" : "tld-mismatch",
       };
     }
 
     // Check 2: Damerau-Levenshtein distance ≤ 2 (classic typosquatting)
-    const distance = levenshteinDistance(strippedName, trustedName);
+    const distance = levenshteinDistance(strippedName, strippedTrustedName);
     if (distance > 0 && distance <= 2) {
       return {
         isSuspicious: true,
         similarTo: trusted,
-        reason: "edit-distance",
+        reason: hasHomoglyphs ? "homoglyph" : "edit-distance",
       };
     }
 
     // Check 3: Trusted name contained as substring (securegaranti.com.tr)
     // Only for names long enough to avoid false positives (≥5 chars)
-    if (trustedName.length >= 5 && strippedName.length > trustedName.length) {
-      if (strippedName.includes(trustedName)) {
+    if (strippedTrustedName.length >= 5 && strippedName.length > strippedTrustedName.length) {
+      if (strippedName.includes(strippedTrustedName)) {
         return {
           isSuspicious: true,
           similarTo: trusted,
@@ -395,6 +397,7 @@ export function checkUrl(
   const typo = checkTyposquatting(domain);
   if (typo.isSuspicious) {
     const reasonLabels: Record<string, { score: number; text: string }> = {
+      "homoglyph": { score: 100, text: "sahte Unicode karakterler kullaniyor (tehlikeli)" },
       "edit-distance": { score: 70, text: "benzer domain (olasi sahte site)" },
       "tld-mismatch": { score: 60, text: "ayni isim farkli uzanti (olasi sahte site)" },
       "contains-trusted-name": { score: 50, text: "guvenilir ismi iceriyor (olasi sahte site)" },
