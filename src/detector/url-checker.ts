@@ -123,8 +123,9 @@ export function levenshteinDistance(a: string, b: string): number {
   return dp[m][n];
 }
 
-// Common unicode confusables: Cyrillic/Greek lookalikes → Latin equivalents
+// Common unicode confusables: Cyrillic/Greek/Latin lookalikes → Latin equivalents
 const CONFUSABLES: Record<string, string> = {
+  // Cyrillic lowercase
   "\u0430": "a", // Cyrillic а
   "\u0435": "e", // Cyrillic е
   "\u043E": "o", // Cyrillic о
@@ -133,10 +134,35 @@ const CONFUSABLES: Record<string, string> = {
   "\u0443": "y", // Cyrillic у
   "\u0445": "x", // Cyrillic х
   "\u0456": "i", // Cyrillic і
+  "\u0455": "s", // Cyrillic ѕ
+  "\u0458": "j", // Cyrillic ј
+  "\u04BB": "h", // Cyrillic һ
+  "\u0491": "r", // Cyrillic ґ (looks like r in some fonts)
+  "\u043A": "k", // Cyrillic к
+  "\u043C": "m", // Cyrillic м (lowercase)
+  "\u043D": "h", // Cyrillic н (lowercase, looks like h)
+  "\u0442": "t", // Cyrillic т (lowercase)
+  "\u0432": "b", // Cyrillic в (lowercase, looks like b)
+  "\u0434": "d", // Cyrillic д (in italic/some fonts)
+  "\u0448": "w", // Cyrillic ш (looks like w in some fonts)
+  "\u044C": "b", // Cyrillic ь (soft sign, resembles b)
+  // Latin extended lookalikes
   "\u0261": "g", // Latin small script g
+  "\u0501": "d", // Cyrillic ԁ
+  "\u0185": "b", // Latin ƅ
+  "\u01C3": "l", // Latin ǃ (click letter, looks like l)
+  // Greek lowercase
   "\u03B1": "a", // Greek α
   "\u03BF": "o", // Greek ο
   "\u03B5": "e", // Greek ε
+  "\u03B9": "i", // Greek ι
+  "\u03BA": "k", // Greek κ
+  "\u03BD": "v", // Greek ν
+  "\u03C1": "p", // Greek ρ
+  "\u03C4": "t", // Greek τ
+  "\u03C5": "u", // Greek υ
+  "\u03C9": "w", // Greek ω
+  // Turkish
   "\u0131": "i", // Turkish dotless ı
 };
 
