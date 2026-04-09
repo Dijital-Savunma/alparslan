@@ -185,6 +185,98 @@ describe("Unicode homoglyph normalization — NOW CAUGHT", () => {
     expect(result.isSuspicious).toBe(true);
     expect(result.similarTo).toBe("isbank.com.tr");
   });
+
+  it("normalizeHomoglyphs replaces Cyrillic ѕ and ј", () => {
+    expect(normalizeHomoglyphs("\u0455ite")).toBe("site");
+    expect(normalizeHomoglyphs("\u0458avascript")).toBe("javascript");
+  });
+
+  it("normalizeHomoglyphs replaces Cyrillic һ, к, т", () => {
+    expect(normalizeHomoglyphs("\u04BBost")).toBe("host");
+    expect(normalizeHomoglyphs("ban\u043Aa")).toBe("banka");
+    expect(normalizeHomoglyphs("garan\u0442i")).toBe("garanti");
+  });
+
+  it("normalizeHomoglyphs replaces Greek ι, κ, ν, ρ, τ, υ", () => {
+    expect(normalizeHomoglyphs("\u03B9sbank")).toBe("isbank");
+    expect(normalizeHomoglyphs("ban\u03BAa")).toBe("banka");
+    expect(normalizeHomoglyphs("de\u03BDlet")).toBe("devlet");
+    expect(normalizeHomoglyphs("\u03C1aypal")).toBe("paypal");
+    expect(normalizeHomoglyphs("garan\u03C4i")).toBe("garanti");
+    expect(normalizeHomoglyphs("g\u03C5ven")).toBe("guven");
+  });
+
+  it("catches domain with Cyrillic ѕ substitution", () => {
+    // "i\u0455bank" looks like "isbank"
+    const result = checkTyposquatting("i\u0455bank.com.tr");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.similarTo).toBe("isbank.com.tr");
+  });
+
+  it("catches domain with mixed Cyrillic/Greek homoglyphs", () => {
+    // "e-de\u03BDle\u0442" → "e-devlet" after normalization
+    const result = checkTyposquatting("e-de\u03BDle\u0442.com");
+    expect(result.isSuspicious).toBe(true);
+  });
+});
+
+// ─── E-DEVLET CYRILLIC HOMOGLYPH ATTACKS ─────────────────────────
+describe("e-devlet Cyrillic homoglyph attacks", () => {
+  it("catches e-devlet with Cyrillic е (U+0435) for both e's", () => {
+    // "\u0435-d\u0435vlet" → "e-devlet"
+    const result = checkTyposquatting("\u0435-d\u0435vlet.gov.tr");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.similarTo).toBe("e-devlet.gov.tr");
+  });
+
+  it("catches e-devlet with only first e as Cyrillic", () => {
+    const result = checkTyposquatting("\u0435-devlet.gov.tr");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.similarTo).toBe("e-devlet.gov.tr");
+  });
+
+  it("catches e-devlet with only second e as Cyrillic", () => {
+    const result = checkTyposquatting("e-d\u0435vlet.gov.tr");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.similarTo).toBe("e-devlet.gov.tr");
+  });
+
+  it("catches e-devlet with Cyrillic а (U+0430) replacing no char but full Cyrillic swap", () => {
+    // all available Cyrillic replacements: е→e, v stays, т→t
+    // "\u0435-d\u0435vl\u0435\u0442" → "e-devlet"
+    const result = checkTyposquatting("\u0435-d\u0435vl\u0435\u0442.gov.tr");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.similarTo).toBe("e-devlet.gov.tr");
+  });
+
+  it("catches e-devlet with Cyrillic т (U+0442) for t", () => {
+    const result = checkTyposquatting("e-devle\u0442.gov.tr");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.similarTo).toBe("e-devlet.gov.tr");
+  });
+
+  it("catches e-devlet on fake TLD with Cyrillic chars", () => {
+    const result = checkTyposquatting("\u0435-d\u0435vlet.com");
+    expect(result.isSuspicious).toBe(true);
+  });
+
+  it("catches edevlet without hyphen using Cyrillic е", () => {
+    const result = checkTyposquatting("\u0435devlet.gov.tr");
+    expect(result.isSuspicious).toBe(true);
+  });
+
+  it("catches e-devlet with Greek ε (U+03B5) for e", () => {
+    const result = checkTyposquatting("\u03B5-d\u03B5vlet.gov.tr");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.similarTo).toBe("e-devlet.gov.tr");
+  });
+
+  it("catches e-devlet with mixed Cyrillic е and Greek ν for v", () => {
+    // "\u0435-de\u03BDlet" → Cyrillic е + Greek ν
+    const result = checkTyposquatting("\u0435-de\u03BDlet.gov.tr");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.similarTo).toBe("e-devlet.gov.tr");
+  });
 });
 
 // ─── SEPARATOR STRIPPING (IMPROVEMENT #6) ─────────────────────────
