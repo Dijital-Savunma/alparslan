@@ -5,7 +5,7 @@ import type { PageAnalysisResult } from "@/detector/page-analyzer";
 import { checkUrl, checkUrlConfirmed, loadBlocklist, extractDomain } from "@/detector/url-checker";
 import { fetchRemoteBlocklist, submitReport, scheduleListUpdates } from "@/blocklist/updater";
 import { initUsomBlocklist, scheduleUsomUpdates } from "@/blocklist/usom-updater";
-import { initWhitelist, scheduleWhitelistUpdates } from "@/blocklist/whitelist-updater";
+import { initWhitelist, scheduleWhitelistUpdates, isWhitelisted, isUgcDomain, getRiskyTld, getWhitelistSize } from "@/blocklist/whitelist-updater";
 import { checkBreach, loadBreachDatabase as loadBreachDB } from "@/breach/checker";
 import { fetchRemoteBreachDatabase } from "@/breach/updater";
 import { collectCurrentWeekMetrics, collectPreviousWeekMetrics, recordPageProtocol, recordThreatVisit } from "@/dashboard/metrics-collector";
@@ -41,6 +41,14 @@ initUsomBlocklist().catch((err) => {
 initWhitelist().catch((err) => {
   console.warn("[Alparslan] Whitelist startup load failed:", err);
 });
+
+// Debug helper — accessible from service worker console
+(globalThis as Record<string, unknown>).debugWhitelist = (domain: string) => {
+  console.log("isWhitelisted:", isWhitelisted(domain));
+  console.log("isUgcDomain:", isUgcDomain(domain));
+  console.log("getRiskyTld:", getRiskyTld(domain));
+  console.log("whitelistSize:", getWhitelistSize());
+};
 
 function persistStats(): void {
   chrome.storage.sync.set({ stats: state.stats });
