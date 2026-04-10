@@ -1,20 +1,29 @@
 // Alparslan - Content Script
 // Not: browser-polyfill import edilmez — content script'te chrome zaten mevcut
 import { analyzePage } from "@/detector/page-analyzer";
+import t from "@/i18n/tr";
 
 const BANNER_HOST_ID = "alparslan-warning-host";
 const BREACH_BANNER_HOST_ID = "alparslan-breach-host";
 
 interface WarningMessage {
-  type: "SHOW_WARNING";
+  type: "SHOW_WARNING" | "RESCAN";
   level: "DANGEROUS" | "SUSPICIOUS";
   reason: string;
   score: number;
 }
 
+// Track if user manually dismissed the banner — don't re-show after dismiss
+let bannerDismissed = false;
+let bannerObserver: MutationObserver | null = null;
+
 function createWarningBanner(level: string, reason: string): void {
+  // Don't recreate if user already dismissed it on this page
+  if (bannerDismissed) return;
+
+  // Don't recreate if already showing (prevents race condition flicker)
   const existing = document.getElementById(BANNER_HOST_ID);
-  if (existing) existing.remove();
+  if (existing) return;
 
   const host = document.createElement("div");
   host.id = BANNER_HOST_ID;
@@ -25,7 +34,7 @@ function createWarningBanner(level: string, reason: string): void {
   const isDangerous = level === "DANGEROUS";
   const bgColor = isDangerous ? "#dc2626" : "#d97706";
   const icon = isDangerous ? "\u26A0\uFE0F" : "\u26A0";
-  const title = isDangerous ? "TEHLIKELI SITE" : "SUPPHELI SITE";
+  const title = isDangerous ? t.banner.dangerous : t.banner.suspicious;
 
   shadow.innerHTML = `
     <style>
@@ -61,21 +70,31 @@ function createWarningBanner(level: string, reason: string): void {
       <div class="banner-content">
         <span class="banner-icon">${icon}</span>
         <div>
-          <div class="banner-title">Alparslan: ${title}</div>
+          <div class="banner-title">${t.banner.prefix} ${title}</div>
           <div class="banner-reason">${escapeHtml(reason)}</div>
         </div>
       </div>
-      <button class="banner-close" id="close-btn">Kapat</button>
+      <button class="banner-close" id="close-btn">${t.close}</button>
     </div>
   `;
 
-  shadow.getElementById("close-btn")?.addEventListener("click", () => host.remove());
+  shadow.getElementById("close-btn")?.addEventListener("click", () => {
+    bannerDismissed = true;
+    host.remove();
+    if (bannerObserver) { bannerObserver.disconnect(); bannerObserver = null; }
+  });
 
-  if (document.body) {
-    document.body.prepend(host);
-  } else {
-    document.documentElement.prepend(host);
-  }
+  // Attach to documentElement (more resilient than body — SPA frameworks often replace body children)
+  document.documentElement.appendChild(host);
+
+  // Watch for removal by page scripts — re-attach if removed (unless user dismissed)
+  if (bannerObserver) bannerObserver.disconnect();
+  bannerObserver = new MutationObserver(() => {
+    if (!bannerDismissed && !document.getElementById(BANNER_HOST_ID)) {
+      document.documentElement.appendChild(host);
+    }
+  });
+  bannerObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
 
 function escapeHtml(text: string): string {
@@ -125,7 +144,7 @@ function createBreachInfoBanner(reason: string): void {
 
   const closeBtn = document.createElement("button");
   closeBtn.className = "breach-close";
-  closeBtn.textContent = "Kapat";
+  closeBtn.textContent = t.close;
   closeBtn.addEventListener("click", () => host.remove());
   banner.appendChild(closeBtn);
 
@@ -141,14 +160,34 @@ function runPageAnalysis(): void {
   try {
     if (!chrome.runtime?.id) return; // extension context invalidated
 
+    const currentUrl = window.location.href;
     const domain = window.location.hostname;
+
+    // Skip internal pages
+    if (currentUrl.startsWith("chrome") || currentUrl.startsWith("about:") || currentUrl.startsWith("moz-extension")) return;
+
+    // Ask background to check this URL — content script is ready now
+    chrome.runtime.sendMessage(
+      { type: "CHECK_URL", url: currentUrl },
+      (response: { level?: string; reasons?: string[]; score?: number } | null) => {
+        if (response && (response.level === "DANGEROUS" || response.level === "SUSPICIOUS")) {
+          // Check if DOM warnings are enabled
+          chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (settingsRes: { settings?: { showDomWarnings?: boolean } } | null) => {
+            if (settingsRes?.settings?.showDomWarnings !== false) {
+              createWarningBanner(response.level!, (response.reasons || []).join(", "));
+            }
+          });
+        }
+      },
+    );
+
     const result = analyzePage(document, domain);
 
     if (result.score > 0) {
       chrome.runtime.sendMessage({
         type: "PAGE_ANALYSIS",
         domain,
-        url: window.location.href,
+        url: currentUrl,
         ...result,
       }).catch(() => {});
     }
@@ -159,7 +198,7 @@ function runPageAnalysis(): void {
       (response: { isBreached: boolean; breaches: { name: string; date: string; dataTypes: string[] }[] } | null) => {
         if (response?.isBreached && response.breaches.length > 0) {
           const breach = response.breaches[0];
-          const reason = "Bu site gecmiste veri sizintisina ugramis: " + breach.name + " (" + breach.date + "). Sizabilecek veriler: " + breach.dataTypes.join(", ");
+          const reason = t.breach.detected(breach.name, breach.date, breach.dataTypes.join(", "));
           createBreachInfoBanner(reason);
         }
       },
@@ -174,6 +213,12 @@ chrome.runtime.onMessage.addListener(
     if (message.type === "SHOW_WARNING") {
       createWarningBanner(message.level, message.reason);
       sendResponse({ shown: true });
+    }
+    if (message.type === "RESCAN") {
+      // Lists just finished loading — re-run full analysis
+      bannerDismissed = false;
+      runPageAnalysis();
+      sendResponse({ ok: true });
     }
     return true;
   },
