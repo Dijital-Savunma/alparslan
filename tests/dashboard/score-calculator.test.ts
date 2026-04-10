@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { calculateScore } from "@/dashboard/score-calculator";
 import { EMPTY_WEEKLY_METRICS, type WeeklyMetrics } from "@/dashboard/types";
+import t from "@/i18n/tr";
 
 describe("calculateScore", () => {
   it("returns 0 score with empty metrics", () => {
@@ -44,9 +45,7 @@ describe("calculateScore", () => {
     };
     const result = calculateScore(metrics);
     expect(result.breakdown.httpsScore).toBe(15);
-    expect(result.tips).toContain(
-      "Guvenli olmayan (HTTP) sitelere dikkat edin. HTTPS olan alternatifleri tercih edin."
-    );
+    expect(result.tips).toContain(t.tips.insecureHttp);
   });
 
   it("penalizes visiting dangerous sites", () => {
@@ -108,9 +107,7 @@ describe("calculateScore", () => {
     };
     const result = calculateScore(metrics);
     expect(result.breakdown.trackerScore).toBe(0);
-    expect(result.tips).toContain(
-      "Tracker engelleyiciyi aktif edin. Gizliliginizi korur."
-    );
+    expect(result.tips).toContain(t.tips.enableTracker);
   });
 
   it("clamps total score between 0 and 100", () => {

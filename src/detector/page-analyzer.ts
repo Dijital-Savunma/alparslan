@@ -1,4 +1,5 @@
 // Advanced page content analysis for phishing detection
+import t from "@/i18n/tr";
 
 export interface PageAnalysisResult {
   hasLoginForm: boolean;
@@ -43,7 +44,7 @@ export function analyzePage(document: Document, currentDomain: string): PageAnal
     ) {
       hasCreditCardField = true;
       score += 15;
-      reasons.push("Kredi karti bilgisi isteniyor");
+      reasons.push(t.analysis.creditCardRequested);
       break;
     }
   }
@@ -58,7 +59,7 @@ export function analyzePage(document: Document, currentDomain: string): PageAnal
           suspiciousFormAction = true;
           externalFormAction = actionUrl.hostname;
           score += 30;
-          reasons.push(`Form verisi farkli sunucuya gonderiliyor: ${actionUrl.hostname}`);
+          reasons.push(t.analysis.externalFormAction(actionUrl.hostname));
         }
       } catch {
         // Invalid URL in action, slightly suspicious
@@ -72,7 +73,7 @@ export function analyzePage(document: Document, currentDomain: string): PageAnal
   if (bodyText.match(/T\.?C\.?\s*[Kk]imlik|TCKN|TC\s*No/)) {
     if (hasPasswordField || hasCreditCardField) {
       score += 20;
-      reasons.push("TC Kimlik numarasi ve hassas bilgi birlikte isteniyor");
+      reasons.push(t.analysis.tcKimlikSensitive);
     }
   }
 
@@ -88,7 +89,7 @@ export function analyzePage(document: Document, currentDomain: string): PageAnal
   for (const pattern of urgencyPatterns) {
     if (bodyText.match(pattern)) {
       score += 15;
-      reasons.push("Aciliyet yaratan dil kullaniliyor");
+      reasons.push(t.analysis.urgencyLanguage);
       break;
     }
   }

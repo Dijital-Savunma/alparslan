@@ -1,4 +1,5 @@
 import type { WeeklyMetrics, ScoreBreakdown, DashboardData } from "./types";
+import t from "@/i18n/tr";
 
 const ACTIVITY_THRESHOLD = 20;
 
@@ -11,9 +12,7 @@ export function calculateScore(metrics: WeeklyMetrics): DashboardData {
     httpsScore = Math.round((metrics.httpsCount / totalPages) * 30);
   }
   if (totalPages > 0 && httpsScore < 30) {
-    tips.push(
-      "Guvenli olmayan (HTTP) sitelere dikkat edin. HTTPS olan alternatifleri tercih edin."
-    );
+    tips.push(t.tips.insecureHttp);
   }
 
   let threatAvoidanceScore = 30;
@@ -28,17 +27,13 @@ export function calculateScore(metrics: WeeklyMetrics): DashboardData {
     threatAvoidanceScore = 0;
   }
   if (metrics.dangerousSitesVisited > 0) {
-    tips.push(
-      `Bu hafta ${metrics.dangerousSitesVisited} tehlikeli siteye girdiniz. Uyarilara dikkat edin.`
-    );
+    tips.push(t.tips.dangerousSites(metrics.dangerousSitesVisited));
   }
   if (
     metrics.suspiciousSitesVisited > 0 &&
     metrics.dangerousSitesVisited === 0
   ) {
-    tips.push(
-      `Bu hafta ${metrics.suspiciousSitesVisited} suppheli site tespit edildi. Dikkatli olun.`
-    );
+    tips.push(t.tips.suspiciousSites(metrics.suspiciousSitesVisited));
   }
 
   const activityRatio = Math.min(
@@ -52,13 +47,11 @@ export function calculateScore(metrics: WeeklyMetrics): DashboardData {
     trackerScore = 20;
   }
   if (metrics.urlsChecked > 0 && metrics.trackersBlocked === 0) {
-    tips.push("Tracker engelleyiciyi aktif edin. Gizliliginizi korur.");
+    tips.push(t.tips.enableTracker);
   }
 
   if (metrics.urlsChecked === 0) {
-    tips.push(
-      "Alparslan aktif degil veya bu hafta hic gezinmediniz. Koruma icin eklentiyi aktif tutun."
-    );
+    tips.push(t.tips.notActive);
   }
 
   const score = Math.min(

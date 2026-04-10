@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { analyzePage } from "@/detector/page-analyzer";
+import t from "@/i18n/tr";
 import { JSDOM } from "jsdom";
 
 function createDocument(html: string): Document {
@@ -29,7 +30,7 @@ describe("analyzePage", () => {
     `);
     const result = analyzePage(doc, "example.com");
     expect(result.hasCreditCardField).toBe(true);
-    expect(result.reasons.some((r) => r.includes("Kredi karti"))).toBe(true);
+    expect(result.reasons).toContain(t.analysis.creditCardRequested);
   });
 
   it("should detect credit card fields by Turkish placeholder", () => {
