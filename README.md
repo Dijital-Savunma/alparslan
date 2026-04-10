@@ -136,7 +136,7 @@ npm run format
 
 ## Katkıda Bulunma
 
-Katkılarınızı bekliyoruz! [Katkı rehberimizi](https://github.com/Dijital-Savunma/.github/blob/main/CONTRIBUTING.md) inceleyin.
+Katkılarınızı bekliyoruz! [Katkı rehberimizi](CONTRIBUTING.md) inceleyin.
 
 Özellikle şu alanlarda katkıya ihtiyacımız var:
 - Türkiye'ye özgü phishing sitelerinin raporlanması
