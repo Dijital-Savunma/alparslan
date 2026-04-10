@@ -1,4 +1,86 @@
 import { ThreatLevel, type ThreatResult, type ExtensionSettings } from "@/utils/types";
+import { usomBloomTest } from "@/blocklist/usom-updater";
+import { hasDomain } from "@/blocklist/indexeddb-store";
+import { isWhitelisted, isUgcDomain, getRiskyTld } from "@/blocklist/whitelist-updater";
+
+// ─── PUNYCODE DECODER (RFC 3492) ─────────────────────────────────
+// Chrome converts IDN domains to punycode (е-devlet.com → xn--devlet-2of.com).
+// We decode them back to Unicode so homoglyph detection can work.
+
+const BASE = 36;
+const TMIN = 1;
+const TMAX = 26;
+const SKEW = 38;
+const DAMP = 700;
+const INITIAL_BIAS = 72;
+const INITIAL_N = 128;
+
+function decodeDigit(cp: number): number {
+  if (cp >= 48 && cp <= 57) return cp - 22; // 0-9 → 26-35
+  if (cp >= 65 && cp <= 90) return cp - 65;  // A-Z → 0-25
+  if (cp >= 97 && cp <= 122) return cp - 97; // a-z → 0-25
+  return BASE;
+}
+
+function adapt(delta: number, numPoints: number, firstTime: boolean): number {
+  let d = firstTime ? Math.floor(delta / DAMP) : Math.floor(delta / 2);
+  d += Math.floor(d / numPoints);
+  let k = 0;
+  while (d > ((BASE - TMIN) * TMAX) / 2) {
+    d = Math.floor(d / (BASE - TMIN));
+    k += BASE;
+  }
+  return k + Math.floor(((BASE - TMIN + 1) * d) / (d + SKEW));
+}
+
+function decodePunycodeLabel(encoded: string): string {
+  const output: number[] = [];
+  let n = INITIAL_N;
+  let bias = INITIAL_BIAS;
+  let i = 0;
+
+  const delimIndex = encoded.lastIndexOf("-");
+  const basicLength = delimIndex < 0 ? 0 : delimIndex;
+
+  for (let j = 0; j < basicLength; j++) {
+    output.push(encoded.charCodeAt(j));
+  }
+
+  let inputPos = basicLength > 0 ? basicLength + 1 : 0;
+
+  while (inputPos < encoded.length) {
+    const oldi = i;
+    let w = 1;
+
+    for (let k = BASE; ; k += BASE) {
+      if (inputPos >= encoded.length) break;
+      const digit = decodeDigit(encoded.charCodeAt(inputPos++));
+      if (digit >= BASE) break;
+      i += digit * w;
+      const t = k <= bias ? TMIN : k >= bias + TMAX ? TMAX : k - bias;
+      if (digit < t) break;
+      w *= BASE - t;
+    }
+
+    const outLen = output.length + 1;
+    bias = adapt(i - oldi, outLen, oldi === 0);
+    n += Math.floor(i / outLen);
+    i %= outLen;
+    output.splice(i, 0, n);
+    i++;
+  }
+
+  return String.fromCodePoint(...output);
+}
+
+export function decodePunycodeDomain(domain: string): string {
+  return domain
+    .split(".")
+    .map((label) =>
+      label.startsWith("xn--") ? decodePunycodeLabel(label.slice(4)) : label,
+    )
+    .join(".");
+}
 
 // Well-known trusted domains — phishing targets in Turkey + major global sites
 const TRUSTED_DOMAINS = new Set([
@@ -46,6 +128,7 @@ const TRUSTED_DOMAINS = new Set([
   "telegram.org",
   "discord.com",
   // Global — email & cloud
+  "gmail.com",
   "microsoft.com",
   "live.com",
   "outlook.com",
@@ -123,8 +206,9 @@ export function levenshteinDistance(a: string, b: string): number {
   return dp[m][n];
 }
 
-// Common unicode confusables: Cyrillic/Greek lookalikes → Latin equivalents
+// Common unicode confusables: Cyrillic/Greek/Latin lookalikes → Latin equivalents
 const CONFUSABLES: Record<string, string> = {
+  // Cyrillic lowercase
   "\u0430": "a", // Cyrillic а
   "\u0435": "e", // Cyrillic е
   "\u043E": "o", // Cyrillic о
@@ -133,11 +217,51 @@ const CONFUSABLES: Record<string, string> = {
   "\u0443": "y", // Cyrillic у
   "\u0445": "x", // Cyrillic х
   "\u0456": "i", // Cyrillic і
+  "\u0455": "s", // Cyrillic ѕ
+  "\u0458": "j", // Cyrillic ј
+  "\u04BB": "h", // Cyrillic һ
+  "\u0491": "r", // Cyrillic ґ (looks like r in some fonts)
+  "\u043A": "k", // Cyrillic к
+  "\u043C": "m", // Cyrillic м (lowercase)
+  "\u043D": "h", // Cyrillic н (lowercase, looks like h)
+  "\u0442": "t", // Cyrillic т (lowercase)
+  "\u0432": "b", // Cyrillic в (lowercase, looks like b)
+  "\u0434": "d", // Cyrillic д (in italic/some fonts)
+  "\u0448": "w", // Cyrillic ш (looks like w in some fonts)
+  "\u044C": "b", // Cyrillic ь (soft sign, resembles b)
+  // Latin extended lookalikes
   "\u0261": "g", // Latin small script g
+  "\u0501": "d", // Cyrillic ԁ
+  "\u0185": "b", // Latin ƅ
+  "\u01C3": "l", // Latin ǃ (click letter, looks like l)
+  // Greek lowercase
   "\u03B1": "a", // Greek α
   "\u03BF": "o", // Greek ο
   "\u03B5": "e", // Greek ε
+  "\u03B9": "i", // Greek ι
+  "\u03BA": "k", // Greek κ
+  "\u03BD": "v", // Greek ν
+  "\u03C1": "p", // Greek ρ
+  "\u03C4": "t", // Greek τ
+  "\u03C5": "u", // Greek υ
+  "\u03C9": "w", // Greek ω
+  // Turkish
+  // Cyrillic uppercase
+  "\u0410": "a", // Cyrillic А
+  "\u0412": "b", // Cyrillic В
+  "\u0415": "e", // Cyrillic Е
+  "\u041A": "k", // Cyrillic К
+  "\u041C": "m", // Cyrillic М
+  "\u041D": "h", // Cyrillic Н (looks like H)
+  "\u041E": "o", // Cyrillic О
+  "\u0420": "p", // Cyrillic Р
+  "\u0421": "c", // Cyrillic С
+  "\u0422": "t", // Cyrillic Т
+  "\u0423": "y", // Cyrillic У
+  "\u0425": "x", // Cyrillic Х
+  // Turkish
   "\u0131": "i", // Turkish dotless ı
+  "\u0130": "i", // Turkish capital İ
 };
 
 export function normalizeHomoglyphs(input: string): string {
@@ -160,7 +284,9 @@ function extractName(rootDomain: string): string {
 export function checkTyposquatting(
   domain: string,
 ): { isSuspicious: boolean; similarTo: string | null; reason: string | null } {
-  const root = extractRootDomain(domain);
+  // Decode punycode labels so homoglyph detection works on Unicode chars
+  const decoded = decodePunycodeDomain(domain);
+  const root = extractRootDomain(decoded);
 
   // If the domain itself is trusted, no typosquatting
   if (TRUSTED_DOMAINS.has(root)) {
@@ -170,43 +296,45 @@ export function checkTyposquatting(
   const rawName = extractName(root);
   const normalizedName = normalizeHomoglyphs(rawName);
   const strippedName = stripSeparators(normalizedName);
+  const hasHomoglyphs = rawName !== normalizedName || domain !== decoded;
 
   // Check all subdomain parts for trusted name hiding (e.g. garanti.evil.com)
-  const subdomainParts = domain.split(".");
+  const subdomainParts = decoded.split(".");
   const allParts = subdomainParts.length > 2 ? subdomainParts.slice(0, -2) : [];
 
   for (const trusted of TRUSTED_DOMAINS) {
     const trustedRoot = extractRootDomain(trusted);
     const trustedName = extractName(trustedRoot);
+    const strippedTrustedName = stripSeparators(trustedName);
 
     if (root === trustedRoot) continue;
 
     // Skip very short trusted names (≤2 chars) to avoid false positives
-    if (trustedName.length <= 2) continue;
+    if (strippedTrustedName.length <= 2) continue;
 
     // Check 1: Same name but different TLD (turkiye.com vs turkiye.gov.tr)
-    if (normalizedName === trustedName || strippedName === trustedName) {
+    if (normalizedName === trustedName || strippedName === strippedTrustedName) {
       return {
         isSuspicious: true,
         similarTo: trusted,
-        reason: "tld-mismatch",
+        reason: hasHomoglyphs ? "homoglyph" : "tld-mismatch",
       };
     }
 
     // Check 2: Damerau-Levenshtein distance ≤ 2 (classic typosquatting)
-    const distance = levenshteinDistance(strippedName, trustedName);
+    const distance = levenshteinDistance(strippedName, strippedTrustedName);
     if (distance > 0 && distance <= 2) {
       return {
         isSuspicious: true,
         similarTo: trusted,
-        reason: "edit-distance",
+        reason: hasHomoglyphs ? "homoglyph" : "edit-distance",
       };
     }
 
     // Check 3: Trusted name contained as substring (securegaranti.com.tr)
     // Only for names long enough to avoid false positives (≥5 chars)
-    if (trustedName.length >= 5 && strippedName.length > trustedName.length) {
-      if (strippedName.includes(trustedName)) {
+    if (strippedTrustedName.length >= 5 && strippedName.length > strippedTrustedName.length) {
+      if (strippedName.includes(strippedTrustedName)) {
         return {
           isSuspicious: true,
           similarTo: trusted,
@@ -259,25 +387,45 @@ export function checkUrl(
   const reasons: string[] = [];
   let score = 0;
 
-  // Check blocklist (all levels)
+  // Check builtin blocklist (all levels)
   if (dangerousDomains.has(domain) || dangerousDomains.has(rootDomain)) {
     score = 100;
     reasons.push("Bilinen tehlikeli site");
     return { level: ThreatLevel.DANGEROUS, score, reasons, url, checkedAt: now };
   }
 
+  // Check USOM Bloom filter (sync, fast — "no" is definitive)
+  if (usomBloomTest(domain) || usomBloomTest(rootDomain)) {
+    score = 100;
+    reasons.push("USOM tehdit listesinde");
+    return { level: ThreatLevel.DANGEROUS, score, reasons, url, checkedAt: now };
+  }
+
+  // Check if domain is trusted (hardcoded + dynamic whitelist)
+  // UGC domains are excluded — they host user content and can't be auto-trusted
+  const isTrusted = !isUgcDomain(domain) && (TRUSTED_DOMAINS.has(rootDomain) || isWhitelisted(rootDomain));
+
   // Low protection: only blocklist check — skip further analysis
   if (protectionLevel === "low") {
-    if (TRUSTED_DOMAINS.has(rootDomain)) {
+    if (isTrusted) {
       return { level: ThreatLevel.SAFE, score: 0, reasons: [], url, checkedAt: now };
     }
     return { level: ThreatLevel.UNKNOWN, score: 0, reasons: [], url, checkedAt: now };
+  }
+
+  // Medium + High: mixed-script / homoglyph detection (catches ANY domain with non-ASCII lookalikes)
+  const decoded = decodePunycodeDomain(domain);
+  const normalized = normalizeHomoglyphs(decoded);
+  if (normalized !== decoded) {
+    score += 80;
+    reasons.push("Sahte Unicode karakterler iceriyor (homoglyph saldirisi)");
   }
 
   // Medium + High: typosquatting check
   const typo = checkTyposquatting(domain);
   if (typo.isSuspicious) {
     const reasonLabels: Record<string, { score: number; text: string }> = {
+      "homoglyph": { score: 100, text: "sahte Unicode karakterler kullaniyor (tehlikeli)" },
       "edit-distance": { score: 70, text: "benzer domain (olasi sahte site)" },
       "tld-mismatch": { score: 60, text: "ayni isim farkli uzanti (olasi sahte site)" },
       "contains-trusted-name": { score: 50, text: "guvenilir ismi iceriyor (olasi sahte site)" },
@@ -289,9 +437,16 @@ export function checkUrl(
     reasons.push(`${typo.similarTo} ile ${match.text}`);
   }
 
+  // Medium + High: risky TLD check
+  const riskyTld = getRiskyTld(domain);
+  if (riskyTld && !isTrusted) {
+    score += 15;
+    reasons.push(`Riskli uzanti (${riskyTld})`);
+  }
+
   // Medium + High: suspicious keyword check
   if (domain.includes("login") || domain.includes("secure") || domain.includes("verify")) {
-    if (!TRUSTED_DOMAINS.has(rootDomain)) {
+    if (!isTrusted) {
       score += 20;
       reasons.push("Suppheli anahtar kelime iceriyor");
     }
@@ -320,11 +475,44 @@ export function checkUrl(
     level = ThreatLevel.DANGEROUS;
   } else if (score >= suspiciousThreshold) {
     level = ThreatLevel.SUSPICIOUS;
-  } else if (TRUSTED_DOMAINS.has(rootDomain)) {
+  } else if (isTrusted) {
     level = ThreatLevel.SAFE;
   } else {
     level = ThreatLevel.UNKNOWN;
   }
 
   return { level, score, reasons, url, checkedAt: now };
+}
+
+/**
+ * Async version that confirms USOM Bloom filter hits against IndexedDB.
+ * Use this when you need zero false positives (e.g. before showing a warning).
+ */
+export async function checkUrlConfirmed(
+  url: string,
+  protectionLevel: ExtensionSettings["protectionLevel"] = "medium",
+): Promise<ThreatResult> {
+  const result = checkUrl(url, protectionLevel);
+
+  // If the sync check flagged it as USOM, confirm via IndexedDB
+  if (result.level === ThreatLevel.DANGEROUS && result.reasons.includes("USOM tehdit listesinde")) {
+    const domain = extractDomain(url);
+    if (domain) {
+      const rootDomain = extractRootDomain(domain);
+      const confirmed = await hasDomain(domain) || await hasDomain(rootDomain);
+      if (!confirmed) {
+        // Bloom filter false positive — re-run without USOM flag
+        // Remove the USOM reason and recalculate
+        const filteredReasons = result.reasons.filter((r) => r !== "USOM tehdit listesinde");
+        return {
+          ...result,
+          level: filteredReasons.length > 0 ? result.level : ThreatLevel.UNKNOWN,
+          score: filteredReasons.length > 0 ? result.score : 0,
+          reasons: filteredReasons,
+        };
+      }
+    }
+  }
+
+  return result;
 }

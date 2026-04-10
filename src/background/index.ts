@@ -2,8 +2,10 @@
 import "@/utils/browser-polyfill";
 import { type Message, type ExtensionSettings, type ExtensionStats, type SiteReport, type ScanHistoryEntry, DEFAULT_SETTINGS, DEFAULT_STATS, MAX_HISTORY_ENTRIES } from "@/utils/types";
 import type { PageAnalysisResult } from "@/detector/page-analyzer";
-import { checkUrl, loadBlocklist, extractDomain } from "@/detector/url-checker";
+import { checkUrl, checkUrlConfirmed, loadBlocklist, extractDomain } from "@/detector/url-checker";
 import { fetchRemoteBlocklist, submitReport, scheduleListUpdates } from "@/blocklist/updater";
+import { initUsomBlocklist, scheduleUsomUpdates } from "@/blocklist/usom-updater";
+import { initWhitelist, scheduleWhitelistUpdates } from "@/blocklist/whitelist-updater";
 import { checkBreach, loadBreachDatabase as loadBreachDB } from "@/breach/checker";
 import { fetchRemoteBreachDatabase } from "@/breach/updater";
 import { collectCurrentWeekMetrics, collectPreviousWeekMetrics, recordPageProtocol, recordThreatVisit } from "@/dashboard/metrics-collector";
@@ -29,6 +31,16 @@ const state: ExtensionState = {
   history: [],
   pageAnalysis: new Map(),
 };
+
+// Load USOM Bloom filter on every service worker wake (from cache or IDB)
+initUsomBlocklist().catch((err) => {
+  console.warn("[Alparslan] USOM startup load failed:", err);
+});
+
+// Load whitelist on every service worker wake (from cache or GitHub)
+initWhitelist().catch((err) => {
+  console.warn("[Alparslan] Whitelist startup load failed:", err);
+});
 
 function persistStats(): void {
   chrome.storage.sync.set({ stats: state.stats });
@@ -74,11 +86,15 @@ chrome.runtime.onInstalled.addListener(() => {
       console.warn("[Alparslan] Could not load blocklist");
     });
 
-  // Schedule periodic remote list updates
-  scheduleListUpdates();
+  // TODO: Re-enable when api.dijitalsavunma.org is live
+  // scheduleListUpdates();
+  // fetchRemoteBlocklist();
 
-  // Try an immediate remote fetch (merges with built-in list)
-  fetchRemoteBlocklist();
+  // Schedule periodic USOM list updates
+  scheduleUsomUpdates();
+
+  // Schedule periodic whitelist updates
+  scheduleWhitelistUpdates();
 
   // Load built-in breach database
   fetch(chrome.runtime.getURL("lists/breached-sites.json"))
@@ -91,8 +107,8 @@ chrome.runtime.onInstalled.addListener(() => {
       console.warn("[Alparslan] Could not load breach database");
     });
 
-  // Try immediate remote breach fetch
-  fetchRemoteBreachDatabase();
+  // TODO: Re-enable when api.dijitalsavunma.org is live
+  // fetchRemoteBreachDatabase();
 });
 
 chrome.runtime.onMessage.addListener(
@@ -118,14 +134,17 @@ chrome.runtime.onMessage.addListener(
         }
       } catch { /* invalid URL — let checkUrl handle it */ }
 
-      const result = checkUrl(message.url as string, state.settings.protectionLevel);
-      if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
-        state.stats.threatsBlocked++;
-        recordThreatVisit(result.level);
-      }
-      persistStats();
-      addHistoryEntry(url, result.level, result.score);
-      sendResponse(result);
+      // Use async confirmed check (verifies USOM Bloom filter hits against IDB)
+      (async () => {
+        const result = await checkUrlConfirmed(url, state.settings.protectionLevel);
+        if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
+          state.stats.threatsBlocked++;
+          recordThreatVisit(result.level);
+        }
+        persistStats();
+        addHistoryEntry(url, result.level, result.score);
+        sendResponse(result);
+      })();
       return true;
     }
 
@@ -273,24 +292,48 @@ function updateBadge(tabId: number, level: string): void {
   chrome.action.setBadgeBackgroundColor({ color: badge.color, tabId });
 }
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
-  if (changeInfo.url && state.enabled) {
-    const result = checkUrl(changeInfo.url, state.settings.protectionLevel);
-    recordPageProtocol(changeInfo.url);
+async function handleNavigation(tabId: number, url: string): Promise<void> {
+  if (!state.enabled) return;
+  if (!url || url.startsWith("chrome://") || url.startsWith("chrome-extension://")) return;
 
-    updateBadge(tabId, result.level);
+  // Use confirmed check to verify USOM Bloom filter hits against IndexedDB
+  const result = await checkUrlConfirmed(url, state.settings.protectionLevel);
+  recordPageProtocol(url);
+  updateBadge(tabId, result.level);
 
-    if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
-      chrome.tabs
-        .sendMessage(tabId, {
-          type: "SHOW_WARNING",
-          level: result.level,
-          reason: result.reasons.join(", "),
-          score: result.score,
-        })
-        .catch(() => {});
-    }
+  if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
+    chrome.tabs
+      .sendMessage(tabId, {
+        type: "SHOW_WARNING",
+        level: result.level,
+        reason: result.reasons.join(", "),
+        score: result.score,
+      })
+      .catch(() => {});
   }
+}
+
+// Fires early — before the page loads (catches DNS failures too)
+chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+  if (details.frameId === 0 && details.url) {
+    handleNavigation(details.tabId, details.url);
+  }
+});
+
+// Fires when URL changes (SPA navigations, redirects)
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
+  if (changeInfo.url) {
+    handleNavigation(tabId, changeInfo.url);
+  }
+});
+
+// Fires when user switches tabs — re-apply badge for active tab
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  chrome.tabs.get(activeInfo.tabId, (tab) => {
+    if (tab?.url) {
+      handleNavigation(activeInfo.tabId, tab.url);
+    }
+  });
 });
 
 export { state };

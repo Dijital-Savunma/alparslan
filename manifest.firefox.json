@@ -33,6 +33,7 @@
     "storage",
     "tabs",
     "alarms",
+    "webNavigation",
     "<all_urls>"
   ],
   "options_ui": {
