@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { DEFAULT_SETTINGS, type ExtensionSettings } from "@/utils/types";
 import type { DashboardData } from "@/dashboard/types";
+import t from "@/i18n/tr";
 
 type ProtectionLevel = ExtensionSettings["protectionLevel"];
 
 const PROTECTION_LABELS: Record<ProtectionLevel, { label: string; desc: string }> = {
-  low: { label: "Dusuk", desc: "Sadece bilinen tehlikeli siteleri engeller" },
-  medium: { label: "Orta", desc: "Tehlikeli siteler + suppheli URL tespiti" },
-  high: { label: "Yuksek", desc: "Tum kontroller aktif, agresif koruma" },
+  low: { label: t.protection.low, desc: t.protection.lowDesc },
+  medium: { label: t.protection.medium, desc: t.protection.mediumDesc },
+  high: { label: t.protection.high, desc: t.protection.highDesc },
 };
 
 export default function Options() {
@@ -50,15 +51,26 @@ export default function Options() {
     saveSettings({ ...settings, notificationsEnabled: !settings.notificationsEnabled });
   };
 
+  const handleNetworkMonitoringToggle = () => {
+    const updated = { ...settings, networkMonitoringEnabled: !settings.networkMonitoringEnabled };
+    // If disabling monitoring, also disable blocking
+    if (!updated.networkMonitoringEnabled) {
+      updated.networkBlockingEnabled = false;
+    }
+    saveSettings(updated);
+  };
+
   const handleAddDomain = () => {
     const domain = newDomain.trim().toLowerCase();
     if (!domain || settings.whitelist.includes(domain)) return;
     saveSettings({ ...settings, whitelist: [...settings.whitelist, domain] });
+    chrome.runtime.sendMessage({ type: "ADD_TO_WHITELIST", domain });
     setNewDomain("");
   };
 
   const handleRemoveDomain = (domain: string) => {
     saveSettings({ ...settings, whitelist: settings.whitelist.filter((d) => d !== domain) });
+    chrome.runtime.sendMessage({ type: "REMOVE_FROM_WHITELIST", domain });
   };
 
   const handleClearData = () => {
@@ -75,16 +87,16 @@ export default function Options() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
         <span style={{ fontSize: 28 }}>{"\uD83D\uDEE1\uFE0F"}</span>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, color: "#1e293b" }}>Alparslan Ayarlar</h1>
+          <h1 style={{ margin: 0, fontSize: 22, color: "#1e293b" }}>{t.options.title}</h1>
           <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-            Guvenlik ve gizlilik tercihlerinizi yonetin
+            {t.options.subtitle}
           </p>
         </div>
       </div>
 
       {/* Security Score Summary */}
       {dashboard && (
-        <Section title="Haftalik Guvenlik Ozeti">
+        <Section title={t.options.weeklySummary}>
           <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
             <div
               style={{
@@ -105,19 +117,19 @@ export default function Options() {
             <div>
               <div style={{ fontSize: 14, fontWeight: 600 }}>
                 {dashboard.score >= 80
-                  ? "Harika! Guvenli geziniyorsunuz."
+                  ? t.scoreMessages.great
                   : dashboard.score >= 50
-                    ? "Iyi, ama iyilestirme alani var."
-                    : "Dikkat! Guvenliginizi artirin."}
+                    ? t.scoreMessages.good
+                    : t.scoreMessages.warning}
               </div>
               <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                Bu hafta {dashboard.currentWeek.urlsChecked} sayfa kontrol edildi
+                {t.weeklyStats(dashboard.currentWeek.urlsChecked)}
               </div>
             </div>
           </div>
           {dashboard.tips.length > 0 && (
             <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>Oneriler</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>{t.dashboard.suggestions}</div>
               {dashboard.tips.map((tip, i) => (
                 <div key={i} style={{ fontSize: 12, color: "#78350f", padding: "3px 0" }}>
                   * {tip}
@@ -140,12 +152,12 @@ export default function Options() {
             fontSize: 13,
           }}
         >
-          Ayarlar kaydedildi
+          {t.options.settingsSaved}
         </div>
       )}
 
       {/* Protection Level */}
-      <Section title="Koruma Seviyesi">
+      <Section title={t.options.protectionLevel}>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {(Object.keys(PROTECTION_LABELS) as ProtectionLevel[]).map((level) => (
             <label
@@ -180,7 +192,7 @@ export default function Options() {
       </Section>
 
       {/* Notifications */}
-      <Section title="Bildirimler">
+      <Section title={t.options.notifications}>
         <label
           style={{
             display: "flex",
@@ -194,9 +206,9 @@ export default function Options() {
           }}
         >
           <div>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>Tehdit Bildirimleri</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{t.options.threatNotifications}</div>
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-              Tehlikeli site tespit edildiginde bildirim goster
+              {t.options.threatNotificationsDesc}
             </div>
           </div>
           <div
@@ -229,10 +241,63 @@ export default function Options() {
         </label>
       </Section>
 
+      {/* Network Monitoring */}
+      <Section title={t.options.networkMonitoring}>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 12px",
+            background: "white",
+            borderRadius: 8,
+            border: "1px solid #e5e7eb",
+            cursor: "pointer",
+            marginBottom: 8,
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{t.options.networkListenLabel}</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+              {t.options.networkListenDesc}
+            </div>
+          </div>
+          <div
+            onClick={handleNetworkMonitoringToggle}
+            style={{
+              width: 44,
+              height: 24,
+              borderRadius: 12,
+              background: settings.networkMonitoringEnabled ? "#22c55e" : "#d1d5db",
+              position: "relative",
+              transition: "background 0.2s",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                background: "white",
+                position: "absolute",
+                top: 2,
+                left: settings.networkMonitoringEnabled ? 22 : 2,
+                transition: "left 0.2s",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+              }}
+            />
+          </div>
+        </label>
+
+        {/* Engelleme ozelligi gecici olarak pasif */}
+      </Section>
+
       {/* Whitelist */}
-      <Section title="Beyaz Liste">
+      <Section title={t.options.whitelist}>
         <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>
-          Bu listedeki siteler icin koruma devredisi birakilir
+          {t.options.whitelistDesc}
         </p>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           <input
@@ -240,7 +305,7 @@ export default function Options() {
             value={newDomain}
             onChange={(e) => setNewDomain(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAddDomain()}
-            placeholder="ornek: example.com"
+            placeholder={t.options.whitelistPlaceholder}
             style={{
               flex: 1,
               padding: "8px 12px",
@@ -263,12 +328,12 @@ export default function Options() {
               fontFamily: "inherit",
             }}
           >
-            Ekle
+            {t.add}
           </button>
         </div>
         {settings.whitelist.length === 0 ? (
           <div style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>
-            Beyaz liste bos
+            {t.options.whitelistEmpty}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -307,7 +372,7 @@ export default function Options() {
       </Section>
 
       {/* Clear Data */}
-      <Section title="Veri Yonetimi">
+      <Section title={t.options.dataManagement}>
         <button
           onClick={handleClearData}
           style={{
@@ -322,21 +387,21 @@ export default function Options() {
             fontWeight: 600,
           }}
         >
-          Tum Verileri Temizle
+          {t.options.clearAll}
         </button>
         {cleared && (
           <span style={{ marginLeft: 12, fontSize: 13, color: "#166534" }}>
-            Veriler temizlendi
+            {t.options.cleared}
           </span>
         )}
         <p style={{ fontSize: 12, color: "#9ca3af", margin: "8px 0 0" }}>
-          Tum ayarlar ve beyaz liste sifirlanir
+          {t.options.clearDesc}
         </p>
       </Section>
 
       {/* Footer */}
       <div style={{ marginTop: 32, textAlign: "center", fontSize: 12, color: "#9ca3af" }}>
-        Alparslan v0.1.0 — Dijital Savunma
+        {t.footer}
       </div>
     </div>
   );
