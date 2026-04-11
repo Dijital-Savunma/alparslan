@@ -3,11 +3,10 @@ import "@/utils/browser-polyfill";
 import { type Message, type ExtensionSettings, type ExtensionStats, type SiteReport, type ScanHistoryEntry, DEFAULT_SETTINGS, DEFAULT_STATS, MAX_HISTORY_ENTRIES } from "@/utils/types";
 import type { PageAnalysisResult } from "@/detector/page-analyzer";
 import { checkUrl, checkUrlConfirmed, extractDomain } from "@/detector/url-checker";
-import { fetchRemoteBlocklist, submitReport, scheduleListUpdates } from "@/blocklist/updater";
+import { fetchRemoteBlocklist, scheduleListUpdates } from "@/blocklist/updater";
 import { initUsomBlocklist, scheduleUsomUpdates } from "@/blocklist/usom-updater";
 import { initWhitelist, scheduleWhitelistUpdates, getDynamicWhitelistSize } from "@/blocklist/whitelist-updater";
 import { checkBreach, loadBreachDatabase as loadBreachDB, initBreachCache } from "@/breach/checker";
-import { fetchRemoteBreachDatabase } from "@/breach/updater";
 import { collectCurrentWeekMetrics, collectPreviousWeekMetrics, recordPageProtocol, recordThreatVisit, recordTrackerBlocked } from "@/dashboard/metrics-collector";
 import { calculateScore } from "@/dashboard/score-calculator";
 import type { BreachEntry } from "@/breach/types";
@@ -51,6 +50,11 @@ function addHistoryEntry(url: string, level: string, score: number): void {
 }
 
 // --- Service worker init (runs on every wake-up, not just install) ---
+// Init gate — CHECK_URL waits for this before responding
+let initDone = false;
+let resolveInit: () => void;
+const initReady = new Promise<void>((resolve) => { resolveInit = resolve; });
+
 // Debug timing state
 const initTimings: Record<string, number> = { _startedAt: Date.now() };
 
@@ -159,6 +163,8 @@ async function initServiceWorker(): Promise<void> {
   initProgress.ready = true;
   initProgress.step = t.init.ready;
   initProgress.percent = 100;
+  initDone = true;
+  resolveInit();
   console.warn(`[Alparslan] Service worker initialized in ${initTimings.total}ms (storage: ${initTimings.storageLoad}ms, cache: ${initTimings.cacheInit}ms)`);
 
   // Re-scan all open tabs now that lists are loaded
@@ -167,7 +173,18 @@ async function initServiceWorker(): Promise<void> {
       if (!tab.id || !tab.url || tab.url.startsWith("chrome") || tab.url.startsWith("about:")) continue;
       const result = checkUrl(tab.url, state.settings.protectionLevel);
       updateBadge(tab.id, result.level);
-      // Tell the content script to re-check
+
+      // Push warning directly for dangerous tabs (backup to RESCAN pull)
+      if ((result.level === "DANGEROUS" || result.level === "SUSPICIOUS") && state.settings.showDomWarnings !== false) {
+        chrome.tabs.sendMessage(tab.id, {
+          type: "SHOW_WARNING",
+          level: result.level,
+          reason: result.reasons.join(", "),
+          score: result.score,
+        }).catch(() => {});
+      }
+
+      // Also tell content script to re-run full analysis
       chrome.tabs.sendMessage(tab.id, { type: "RESCAN" }).catch(() => {});
     }
   });
@@ -228,8 +245,6 @@ chrome.runtime.onInstalled.addListener(() => {
       console.warn("[Alparslan] Could not load breach database");
     });
 
-  // Try immediate remote breach fetch
-  fetchRemoteBreachDatabase();
 });
 
 chrome.runtime.onMessage.addListener(
@@ -244,19 +259,22 @@ chrome.runtime.onMessage.addListener(
       state.stats.urlsChecked++;
       const url = message.url as string;
 
-      // Check whitelist via IndexedDB-backed cache
-      try {
-        const hostname = new URL(url).hostname.toLowerCase();
-        if (isWhitelisted(hostname)) {
-          persistStats();
-          addHistoryEntry(url, "SAFE", 0);
-          sendResponse({ level: "SAFE", score: 0, reasons: [t.reasons.whitelisted], url, checkedAt: Date.now() });
-          return true;
-        }
-      } catch { /* invalid URL — let checkUrl handle it */ }
-
-      // Use async confirmed check (verifies USOM Bloom filter hits against IDB)
       (async () => {
+        // Wait for lists to be loaded before checking — prevents false SAFE on cold start
+        if (!initDone) await initReady;
+
+        // Check whitelist via IndexedDB-backed cache
+        try {
+          const hostname = new URL(url).hostname.toLowerCase();
+          if (isWhitelisted(hostname)) {
+            persistStats();
+            addHistoryEntry(url, "SAFE", 0);
+            sendResponse({ level: "SAFE", score: 0, reasons: [t.reasons.whitelisted], url, checkedAt: Date.now(), showDomWarnings: state.settings.showDomWarnings !== false });
+            return;
+          }
+        } catch { /* invalid URL — let checkUrl handle it */ }
+
+        // Use async confirmed check (verifies USOM Bloom filter hits against IDB)
         const result = await checkUrlConfirmed(url, state.settings.protectionLevel);
         if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
           state.stats.threatsBlocked++;
@@ -264,7 +282,7 @@ chrome.runtime.onMessage.addListener(
         }
         persistStats();
         addHistoryEntry(url, result.level, result.score);
-        sendResponse(result);
+        sendResponse({ ...result, showDomWarnings: state.settings.showDomWarnings !== false });
       })();
       return true;
     }
@@ -370,9 +388,6 @@ chrome.runtime.onMessage.addListener(
       state.reports.push(report);
       chrome.storage.sync.set({ reports: state.reports });
 
-      // Submit to remote API (fire-and-forget)
-      submitReport({ domain, url, reportType, description });
-
       sendResponse({ ok: true });
       return true;
     }
@@ -475,12 +490,34 @@ function updateBadge(tabId: number, level: string): void {
   chrome.action.setBadgeBackgroundColor({ color: badge.color, tabId });
 }
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
-  if (changeInfo.url && state.enabled) {
-    const result = checkUrl(changeInfo.url, state.settings.protectionLevel);
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!state.enabled) return;
+
+  // On URL change: record protocol (sync, doesn't need lists)
+  if (changeInfo.url) {
     recordPageProtocol(changeInfo.url);
-    updateBadge(tabId, result.level);
-    // DOM warning is handled by content script itself (CHECK_URL on load)
+  }
+
+  // On page complete: push SHOW_WARNING to content script as a backup
+  // (content script also pulls via CHECK_URL, but this ensures coverage)
+  if (changeInfo.status === "complete") {
+    const url = tab.url;
+    if (!url || url.startsWith("chrome") || url.startsWith("about:") || url.startsWith("moz-extension")) return;
+
+    (async () => {
+      if (!initDone) await initReady;
+      const result = await checkUrlConfirmed(url, state.settings.protectionLevel);
+      updateBadge(tabId, result.level);
+
+      if ((result.level === "DANGEROUS" || result.level === "SUSPICIOUS") && state.settings.showDomWarnings !== false) {
+        chrome.tabs.sendMessage(tabId, {
+          type: "SHOW_WARNING",
+          level: result.level,
+          reason: result.reasons.join(", "),
+          score: result.score,
+        }).catch(() => {});
+      }
+    })();
   }
 });
 
