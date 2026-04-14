@@ -51,6 +51,7 @@ Object.defineProperty(globalThis, "chrome", {
       },
       onRemoved: { addListener: vi.fn() },
       sendMessage: sendMessageMock,
+      query: vi.fn((_q: unknown, cb: (tabs: { id?: number }[]) => void) => cb([])),
     },
     storage: {
       sync: {
@@ -153,6 +154,21 @@ describe("Background Service Worker", () => {
 
       expect(sendResponse).toHaveBeenCalledWith({ enabled: false });
       expect(storageSetMock).toHaveBeenCalledWith({ enabled: false });
+    });
+
+    it("CHECK_URL returns neutral UNKNOWN with showDomWarnings=false when disabled", () => {
+      const sr = vi.fn();
+      onMessageCallback({ type: "SET_ENABLED", enabled: false }, {}, vi.fn());
+      onMessageCallback({ type: "CHECK_URL", url: "https://isbenk.com.tr/login" }, {}, sr);
+
+      // Kill switch path is synchronous — no need to await
+      expect(sr).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: "UNKNOWN",
+          score: 0,
+          showDomWarnings: false,
+        }),
+      );
     });
   });
 

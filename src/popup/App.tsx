@@ -90,6 +90,12 @@ export default function App() {
 
   // Fetch all popup data — re-runs when init becomes ready
   useEffect(() => {
+    // Restore persisted enabled state so the toggle reflects reality
+    // after closing and reopening the popup.
+    chrome.storage.sync.get("enabled", (result) => {
+      if (typeof result.enabled === "boolean") setEnabled(result.enabled);
+    });
+
     chrome.runtime.sendMessage({ type: "GET_STATS" }, (response: { stats: ExtensionStats } | null) => {
       if (response?.stats) setStats(response.stats);
     });

@@ -255,9 +255,24 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === "CHECK_URL") {
+      const url = message.url as string;
+
+      // Kill switch: when disabled, return a neutral response and suppress
+      // DOM warnings. Skips stats bump so disabled periods don't inflate counters.
+      if (!state.enabled) {
+        sendResponse({
+          level: "UNKNOWN",
+          score: 0,
+          reasons: [],
+          url,
+          checkedAt: Date.now(),
+          showDomWarnings: false,
+        });
+        return true;
+      }
+
       state.checkedUrls++;
       state.stats.urlsChecked++;
-      const url = message.url as string;
 
       (async () => {
         // Wait for lists to be loaded before checking — prevents false SAFE on cold start
@@ -295,6 +310,22 @@ chrome.runtime.onMessage.addListener(
     if (message.type === "SET_ENABLED") {
       state.enabled = message.enabled as boolean;
       chrome.storage.sync.set({ enabled: state.enabled });
+
+      if (state.enabled) {
+        // Re-enable: restart network monitor if the user has that feature on
+        if (state.settings.networkMonitoringEnabled) {
+          startRequestMonitoring(state.settings);
+        }
+      } else {
+        // Kill switch: stop network monitoring and clear action badges on all tabs
+        stopRequestMonitoring();
+        chrome.tabs.query({}, (tabs) => {
+          for (const tab of tabs) {
+            if (tab.id !== undefined) chrome.action.setBadgeText({ text: "", tabId: tab.id });
+          }
+        });
+      }
+
       sendResponse({ enabled: state.enabled });
       return true;
     }
