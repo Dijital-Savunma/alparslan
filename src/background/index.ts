@@ -41,9 +41,27 @@ function persistStats(): void {
   chrome.storage.sync.set({ stats: state.stats });
 }
 
+/**
+ * Drops query string + fragment before persisting a URL.
+ * Scan history and site reports would otherwise leak password-reset
+ * tokens, OAuth codes, magic-link credentials, and similar
+ * query-string secrets into chrome.storage.local.
+ */
+function sanitizeUrlForStorage(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.origin + u.pathname;
+  } catch {
+    // Not a parseable URL — fall back to the domain or empty string
+    // rather than emitting the raw value, which may itself be noise.
+    return extractDomain(url) ?? "";
+  }
+}
+
 function addHistoryEntry(url: string, level: string, score: number): void {
-  const domain = extractDomain(url) || url;
-  state.history.unshift({ url, domain, level: level as ScanHistoryEntry["level"], score, checkedAt: Date.now() });
+  const safeUrl = sanitizeUrlForStorage(url);
+  const domain = extractDomain(url) || safeUrl;
+  state.history.unshift({ url: safeUrl, domain, level: level as ScanHistoryEntry["level"], score, checkedAt: Date.now() });
   if (state.history.length > MAX_HISTORY_ENTRIES) {
     state.history = state.history.slice(0, MAX_HISTORY_ENTRIES);
   }
@@ -116,11 +134,19 @@ async function initServiceWorker(): Promise<void> {
     state.stats = { ...DEFAULT_STATS, ...(syncResult.stats as ExtensionStats) };
   }
   if (syncResult.reports) {
-    state.reports = syncResult.reports as SiteReport[];
+    // Strip legacy query/fragment from pre-sanitise reports that were
+    // written before this version.
+    state.reports = (syncResult.reports as SiteReport[]).map((r) => ({
+      ...r,
+      url: sanitizeUrlForStorage(r.url),
+    }));
   }
   // History is stored in local (no sync size limit)
   if (localResult.history) {
-    state.history = localResult.history as ScanHistoryEntry[];
+    state.history = (localResult.history as ScanHistoryEntry[]).map((e) => ({
+      ...e,
+      url: sanitizeUrlForStorage(e.url),
+    }));
   }
 
   // Step 2: Init blacklist cache from IndexedDB
@@ -433,12 +459,22 @@ chrome.runtime.onMessage.addListener(
         sendResponse({ ok: false, reason: "already_reported" });
         return true;
       }
+      // Rate-limit to prevent a loop in the UI / buggy caller from
+      // filling chrome.storage.sync (which has a fixed quota).
+      const hourAgo = Date.now() - 60 * 60 * 1000;
+      const reportsLastHour = state.reports.filter((r) => r.reportedAt >= hourAgo).length;
+      if (reportsLastHour >= 10) {
+        sendResponse({ ok: false, reason: "rate_limited" });
+        return true;
+      }
       const reportType = message.reportType as "dangerous" | "safe";
       const description = (message.description as string) || "";
       const url = message.url as string;
       const report: SiteReport = {
         domain,
-        url,
+        // Sanitize — reports are persisted; keep them free of
+        // query/fragment secrets.
+        url: sanitizeUrlForStorage(url),
         reportType,
         description,
         reportedAt: Date.now(),
