@@ -15,6 +15,7 @@ import type { BlacklistEntry } from "@/storage/types";
 import { startRequestMonitoring, stopRequestMonitoring, updateMonitoringSettings, getMonitoringStats, getTabMonitoringStats, clearTabStats } from "@/network/request-monitor";
 import { setTtlMinutes } from "@/network/url-check-cache";
 import t from "@/i18n/tr";
+import { logger } from "@/utils/logger";
 
 interface ExtensionState {
   enabled: boolean;
@@ -143,13 +144,13 @@ async function initServiceWorker(): Promise<void> {
   initTimings.usomWhitelistBreach = t2end;
 
   updateProgress(2, t2end); // USOM
-  if (usomResult.status === "rejected") console.warn("[Alparslan] USOM init failed:", usomResult.reason);
+  if (usomResult.status === "rejected") logger.warn("USOM init failed:", usomResult.reason);
 
   updateProgress(3, t2end); // Whitelist
-  if (wlResult.status === "rejected") console.warn("[Alparslan] Whitelist init failed:", wlResult.reason);
+  if (wlResult.status === "rejected") logger.warn("Whitelist init failed:", wlResult.reason);
 
   updateProgress(4, t2end); // Breach
-  if (breachResult.status === "rejected") console.warn("[Alparslan] Breach init failed:", breachResult.reason);
+  if (breachResult.status === "rejected") logger.warn("Breach init failed:", breachResult.reason);
 
   // Set URL check cache TTL from settings
   setTtlMinutes(state.settings.urlCacheTtlMinutes);
@@ -165,7 +166,7 @@ async function initServiceWorker(): Promise<void> {
   initProgress.percent = 100;
   initDone = true;
   resolveInit();
-  console.warn(`[Alparslan] Service worker initialized in ${initTimings.total}ms (storage: ${initTimings.storageLoad}ms, cache: ${initTimings.cacheInit}ms)`);
+  logger.debug(`Service worker initialized in ${initTimings.total}ms (storage: ${initTimings.storageLoad}ms, cache: ${initTimings.cacheInit}ms)`);
 
   // Re-scan all open tabs now that lists are loaded
   chrome.tabs.query({}, (tabs) => {
@@ -191,11 +192,11 @@ async function initServiceWorker(): Promise<void> {
 }
 
 initServiceWorker().catch((err) => {
-  console.warn("[Alparslan] Service worker init error:", err);
+  logger.warn("Service worker init error:", err);
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.warn("[Alparslan] Extension installed");
+  logger.debug("Extension installed");
 
   // Clear any leftover DNR block rules from previous version
   if (chrome.declarativeNetRequest?.getDynamicRules) {
@@ -203,7 +204,7 @@ chrome.runtime.onInstalled.addListener(() => {
       const blockRuleIds = rules.filter((r) => r.id >= 1000).map((r) => r.id);
       if (blockRuleIds.length > 0) {
         chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: blockRuleIds });
-        console.warn(`[Alparslan] Cleared ${blockRuleIds.length} leftover DNR rules`);
+        logger.debug(`Cleared ${blockRuleIds.length} leftover DNR rules`);
       }
     }).catch(() => {});
   }
@@ -221,10 +222,10 @@ chrome.runtime.onInstalled.addListener(() => {
       return addToBlacklist(entries);
     })
     .then(() => {
-      console.warn("[Alparslan] Built-in blocklist loaded into IndexedDB");
+      logger.debug("Built-in blocklist loaded into IndexedDB");
     })
     .catch(() => {
-      console.warn("[Alparslan] Could not load blocklist");
+      logger.warn("Could not load blocklist");
     });
 
   // Schedule periodic list updates (USOM + whitelist + remote blocklist)
@@ -238,11 +239,11 @@ chrome.runtime.onInstalled.addListener(() => {
     .then((r) => r.json())
     .then((data: { breaches: BreachEntry[] }) => {
       return loadBreachDB(data.breaches).then(() => {
-        console.warn("[Alparslan] Breach DB stored in IndexedDB: " + String(data.breaches.length) + " entries");
+        logger.debug("Breach DB stored in IndexedDB: " + String(data.breaches.length) + " entries");
       });
     })
     .catch(() => {
-      console.warn("[Alparslan] Could not load breach database");
+      logger.warn("Could not load breach database");
     });
 
 });
@@ -359,14 +360,14 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === "ADD_TO_WHITELIST") {
       const domain = message.domain as string;
-      addToWhitelist(domain).catch((err) => console.warn("[Alparslan] Whitelist add error:", err));
+      addToWhitelist(domain).catch((err) => logger.warn("Whitelist add error:", err));
       sendResponse({ ok: true });
       return true;
     }
 
     if (message.type === "REMOVE_FROM_WHITELIST") {
       const domain = message.domain as string;
-      removeFromWhitelist(domain).catch((err) => console.warn("[Alparslan] Whitelist remove error:", err));
+      removeFromWhitelist(domain).catch((err) => logger.warn("Whitelist remove error:", err));
       sendResponse({ ok: true });
       return true;
     }

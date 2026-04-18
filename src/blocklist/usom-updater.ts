@@ -9,6 +9,7 @@ import {
   deserializeBloomFilter,
   type BloomFilterData,
 } from "./bloom-filter";
+import { logger } from "@/utils/logger";
 
 const USOM_ALARM_NAME = "alparslan-usom-update";
 const STORAGE_KEY_VERSION = "usom-version";
@@ -47,14 +48,14 @@ async function rebuildBloomFromIDB(): Promise<void> {
   if (domains.length === 0) return;
 
   bloomFilter = await createBloomFilterAsync(domains);
-  console.warn(`[Alparslan] USOM Bloom filter built: ${domains.length} domains, ${(bloomFilter.bits.byteLength / 1024).toFixed(0)}KB`);
+  logger.debug(`USOM Bloom filter built: ${domains.length} domains, ${(bloomFilter.bits.byteLength / 1024).toFixed(0)}KB`);
 
   try {
     const serialized = serializeBloomFilter(bloomFilter);
     const base64 = arrayBufferToBase64(serialized);
     await chrome.storage.local.set({ [STORAGE_KEY_BLOOM]: base64 });
   } catch (err) {
-    console.warn("[Alparslan] Could not cache Bloom filter:", err);
+    logger.warn("Could not cache Bloom filter:", err);
   }
 }
 
@@ -66,7 +67,7 @@ async function loadCachedBloom(): Promise<boolean> {
 
     const buffer = base64ToArrayBuffer(base64);
     bloomFilter = deserializeBloomFilter(buffer);
-    console.warn(`[Alparslan] USOM Bloom filter loaded from cache: ${bloomFilter.numBits} bits`);
+    logger.debug(`USOM Bloom filter loaded from cache: ${bloomFilter.numBits} bits`);
     return true;
   } catch {
     return false;
@@ -113,7 +114,7 @@ async function fetchRemoteList(): Promise<string[]> {
 async function storeAndBuildBloom(domains: string[], version: Partial<UsomVersion>): Promise<void> {
   // Build Bloom filter FIRST — makes USOM checks available immediately
   bloomFilter = await createBloomFilterAsync(domains);
-  console.warn(`[Alparslan] USOM Bloom filter built: ${domains.length} domains, ${(bloomFilter.bits.byteLength / 1024).toFixed(0)}KB`);
+  logger.debug(`USOM Bloom filter built: ${domains.length} domains, ${(bloomFilter.bits.byteLength / 1024).toFixed(0)}KB`);
 
   // Cache serialized Bloom filter for fast next startup
   try {
@@ -121,7 +122,7 @@ async function storeAndBuildBloom(domains: string[], version: Partial<UsomVersio
     const base64 = arrayBufferToBase64(serialized);
     await chrome.storage.local.set({ [STORAGE_KEY_BLOOM]: base64 });
   } catch (err) {
-    console.warn("[Alparslan] Could not cache Bloom filter:", err);
+    logger.warn("Could not cache Bloom filter:", err);
   }
 
   // Save version info (small, fast)
@@ -137,8 +138,8 @@ async function storeAndBuildBloom(domains: string[], version: Partial<UsomVersio
   // Bloom filter handles lookups; IDB is only for hasDomain() confirmations
   clearBySource("usom")
     .then(() => bulkInsertDomains(domains, "usom"))
-    .then((inserted) => console.warn(`[Alparslan] USOM list stored in IndexedDB: ${inserted} domains`))
-    .catch((err) => console.warn("[Alparslan] USOM IDB store error:", err));
+    .then((inserted) => logger.debug(`USOM list stored in IndexedDB: ${inserted} domains`))
+    .catch((err) => logger.warn("USOM IDB store error:", err));
 }
 
 export async function initUsomBlocklist(): Promise<void> {
@@ -155,14 +156,14 @@ export async function initUsomBlocklist(): Promise<void> {
 
   // First time: fetch from GitHub
   try {
-    console.warn("[Alparslan] Fetching USOM list from GitHub...");
+    logger.debug("Fetching USOM list from GitHub...");
     const t0 = Date.now();
     const domains = await fetchRemoteList();
     const { remote } = await checkRemoteVersion();
     await storeAndBuildBloom(domains, remote ?? {});
-    console.warn(`[Alparslan] USOM init complete: ${domains.length} domains in ${Date.now() - t0}ms`);
+    logger.debug(`USOM init complete: ${domains.length} domains in ${Date.now() - t0}ms`);
   } catch (err) {
-    console.warn("[Alparslan] USOM init error:", err);
+    logger.warn("USOM init error:", err);
   }
 }
 
@@ -186,18 +187,18 @@ async function refreshUsomList(): Promise<void> {
   try {
     const { hasUpdate, remote } = await checkRemoteVersion();
     if (!hasUpdate) {
-      console.warn("[Alparslan] USOM list is up to date");
+      logger.debug("USOM list is up to date");
       return;
     }
 
-    console.warn("[Alparslan] USOM list update available, downloading...");
+    logger.debug("USOM list update available, downloading...");
     const domains = await fetchRemoteList();
     if (domains.length > 0) {
       await storeAndBuildBloom(domains, remote ?? {});
-      console.warn(`[Alparslan] USOM list refreshed: ${domains.length} domains`);
+      logger.debug(`USOM list refreshed: ${domains.length} domains`);
     }
   } catch (err) {
-    console.warn("[Alparslan] USOM refresh error:", err);
+    logger.warn("USOM refresh error:", err);
   }
 }
 

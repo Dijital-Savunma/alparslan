@@ -1,5 +1,6 @@
 import type { BreachEntry, BreachCheckResult } from "./types";
 import { getAllBreaches, replaceBreaches, getBreachByDomain, type BreachRecord } from "@/storage/idb";
+import { logger } from "@/utils/logger";
 
 // In-memory cache for fast sync lookups
 let breachCache: Map<string, BreachEntry> = new Map();
@@ -16,7 +17,7 @@ export async function loadBreachDatabase(entries: BreachEntry[]): Promise<void> 
   const records = entries.map(toBreachRecord);
   await replaceBreaches(records);
   breachCache = new Map(entries.map((e) => [e.domain.toLowerCase(), { ...e, domain: e.domain.toLowerCase() }]));
-  console.warn(`[Alparslan] Breach DB stored in IndexedDB: ${breachCache.size} entries`);
+  logger.debug(`Breach DB stored in IndexedDB: ${breachCache.size} entries`);
 }
 
 export async function initBreachCache(): Promise<void> {
@@ -24,10 +25,10 @@ export async function initBreachCache(): Promise<void> {
     const records = await getAllBreaches();
     if (records.length > 0) {
       breachCache = new Map(records.map((r) => [r.domain, toBreachEntry(r)]));
-      console.warn(`[Alparslan] Breach DB loaded from IndexedDB: ${breachCache.size} entries`);
+      logger.debug(`Breach DB loaded from IndexedDB: ${breachCache.size} entries`);
     }
   } catch (err) {
-    console.warn("[Alparslan] Breach cache init error:", err);
+    logger.warn("Breach cache init error:", err);
   }
 }
 

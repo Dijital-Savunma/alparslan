@@ -11,6 +11,7 @@ import {
   getMetadata,
   setMetadata,
 } from "@/storage/idb";
+import { logger } from "@/utils/logger";
 
 const GITHUB_BASE = "https://raw.githubusercontent.com/AsabiAlgo/blocklists/main";
 const WHITELIST_URL = `${GITHUB_BASE}/whitelist.txt`;
@@ -74,7 +75,7 @@ async function loadFromIdb(): Promise<boolean> {
     ugcDomains = new Set(ugcList);
     riskyTlds = tldList;
 
-    console.warn(`[Alparslan] Whitelist loaded from IndexedDB: ${whitelistDomains.size} domains`);
+    logger.debug(`Whitelist loaded from IndexedDB: ${whitelistDomains.size} domains`);
     return true;
   } catch {
     return false;
@@ -110,7 +111,7 @@ async function hasRemoteUpdate(): Promise<boolean> {
 }
 
 async function fetchAndStore(): Promise<void> {
-  console.warn("[Alparslan] Fetching whitelist from GitHub...");
+  logger.debug("Fetching whitelist from GitHub...");
   const t0 = Date.now();
 
   const [wlDomains, ugcList, tldList] = await Promise.all([
@@ -148,8 +149,8 @@ async function fetchAndStore(): Promise<void> {
     // version check is optional
   }
 
-  console.warn(
-    `[Alparslan] Whitelist stored in IndexedDB: ${whitelistDomains.size} domains, ` +
+  logger.debug(
+    `Whitelist stored in IndexedDB: ${whitelistDomains.size} domains, ` +
     `${ugcDomains.size} UGC domains, ${riskyTlds.length} risky TLDs (${Date.now() - t0}ms)`,
   );
 }
@@ -161,7 +162,7 @@ export async function initWhitelist(): Promise<void> {
   try {
     await fetchAndStore();
   } catch (err) {
-    console.warn("[Alparslan] Whitelist init error:", err);
+    logger.warn("Whitelist init error:", err);
   }
 }
 
@@ -169,12 +170,12 @@ async function refreshWhitelist(): Promise<void> {
   try {
     const needsUpdate = await hasRemoteUpdate();
     if (!needsUpdate) {
-      console.warn("[Alparslan] Whitelist is up to date");
+      logger.debug("Whitelist is up to date");
       return;
     }
     await fetchAndStore();
   } catch (err) {
-    console.warn("[Alparslan] Whitelist refresh error:", err);
+    logger.warn("Whitelist refresh error:", err);
   }
 }
 

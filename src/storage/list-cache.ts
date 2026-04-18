@@ -1,4 +1,5 @@
 import type { BlacklistEntry } from "./types";
+import { logger } from "@/utils/logger";
 import {
   getAllWhitelist,
   getAllBlacklist,
@@ -91,7 +92,7 @@ async function runMigration(): Promise<void> {
   const migrated = await getMetadata("migrationV1Complete");
   if (migrated === true) return;
 
-  console.warn("[Alparslan] Running IndexedDB migration...");
+  logger.debug("Running IndexedDB migration...");
 
   // Migrate whitelist from chrome.storage.sync
   try {
@@ -107,10 +108,10 @@ async function runMigration(): Promise<void> {
           await idbAddWhitelist(d, "import");
         }
       }
-      console.warn(`[Alparslan] Migrated ${settings.whitelist.length} whitelist entries`);
+      logger.debug(`Migrated ${settings.whitelist.length} whitelist entries`);
     }
   } catch (err) {
-    console.warn("[Alparslan] Whitelist migration error:", err);
+    logger.warn("Whitelist migration error:", err);
   }
 
   // Load built-in blocklist into IndexedDB
@@ -128,14 +129,14 @@ async function runMigration(): Promise<void> {
       for (const entry of entries) {
         blacklistSet.add(entry.domain);
       }
-      console.warn(`[Alparslan] Migrated ${entries.length} blacklist entries`);
+      logger.debug(`Migrated ${entries.length} blacklist entries`);
     }
   } catch (err) {
-    console.warn("[Alparslan] Blacklist migration error:", err);
+    logger.warn("Blacklist migration error:", err);
   }
 
   await setMetadata("migrationV1Complete", true);
-  console.warn("[Alparslan] Migration complete");
+  logger.debug("Migration complete");
 }
 
 // --- Initialization ---
@@ -154,9 +155,9 @@ export async function initListCache(): Promise<void> {
     await runMigration();
 
     cacheReady = true;
-    console.warn(`[Alparslan] List cache ready: ${whitelistSet.size} whitelist, ${blacklistSet.size} blacklist`);
+    logger.debug(`List cache ready: ${whitelistSet.size} whitelist, ${blacklistSet.size} blacklist`);
   } catch (err) {
-    console.warn("[Alparslan] List cache init failed, using empty sets:", err);
+    logger.warn("List cache init failed, using empty sets:", err);
     cacheReady = true; // Still mark ready so the extension doesn't hang
   }
 }
