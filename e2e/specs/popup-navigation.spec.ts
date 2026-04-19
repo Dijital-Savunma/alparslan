@@ -25,14 +25,14 @@ test.describe("Popup Navigation", () => {
   test("should switch to Skor tab when clicked", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByText("Skor").click();
-    await expect(popup.getByText("Haftalik Guvenlik Skoru")).toBeVisible();
+    await expect(popup.getByText("Haftalık Güvenlik Skoru")).toBeVisible();
     await popup.close();
   });
 
   test("should switch back to Durum tab", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByText("Skor").click();
-    await expect(popup.getByText("Haftalik Guvenlik Skoru")).toBeVisible();
+    await expect(popup.getByText("Haftalık Güvenlik Skoru")).toBeVisible();
     await popup.getByText("Durum").click();
     await expect(popup.getByText("Kontrol")).toBeVisible();
     await popup.close();
@@ -50,7 +50,7 @@ test.describe("Popup Navigation", () => {
     const toggleTrack = popup.locator('label div[style*="width: 36px"]');
     await toggleTrack.click();
     await expect(popup.getByText("Pasif")).toBeVisible();
-    await expect(popup.getByText("Koruma Kapali")).toBeVisible();
+    await expect(popup.getByText("Koruma Kapalı")).toBeVisible();
     await popup.close();
   });
 });
