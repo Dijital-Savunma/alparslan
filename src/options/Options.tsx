@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { DEFAULT_SETTINGS, type ExtensionSettings } from "@/utils/types";
 import type { DashboardData } from "@/dashboard/types";
+import { normalizeWhitelistInput } from "@/utils/whitelist-normalize";
 import t from "@/i18n/tr";
 
 type ProtectionLevel = ExtensionSettings["protectionLevel"];
@@ -10,6 +11,7 @@ const PROTECTION_LABELS: Record<ProtectionLevel, { label: string; desc: string }
   medium: { label: t.protection.medium, desc: t.protection.mediumDesc },
   high: { label: t.protection.high, desc: t.protection.highDesc },
 };
+
 
 export default function Options() {
   const [settings, setSettings] = useState<ExtensionSettings>(DEFAULT_SETTINGS);
@@ -61,7 +63,7 @@ export default function Options() {
   };
 
   const handleAddDomain = () => {
-    const domain = newDomain.trim().toLowerCase();
+    const domain = normalizeWhitelistInput(newDomain);
     if (!domain || settings.whitelist.includes(domain)) return;
     saveSettings({ ...settings, whitelist: [...settings.whitelist, domain] });
     chrome.runtime.sendMessage({ type: "ADD_TO_WHITELIST", domain });

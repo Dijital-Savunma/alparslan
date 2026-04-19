@@ -47,7 +47,10 @@ const tr = {
   // --- Sayfa analizi (page-analyzer) ---
   analysis: {
     creditCardRequested: "Kredi kartı bilgisi isteniyor",
-    externalFormAction: (hostname: string) => `Form verisi farklı sunucuya gönderiliyor: ${hostname}`,
+    externalFormAction: (hostname: string, count = 1) =>
+      count > 1
+        ? `Form verisi farklı sunucuya gönderiliyor: ${hostname} (${count} form)`
+        : `Form verisi farklı sunucuya gönderiliyor: ${hostname}`,
     tcKimlikSensitive: "TC Kimlik numarası ve hassas bilgi birlikte isteniyor",
     urgencyLanguage: "Aciliyet yaratan dil kullanılıyor",
   },

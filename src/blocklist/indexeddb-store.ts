@@ -4,7 +4,7 @@
 const DB_NAME = "alparslan-blocklist";
 const DB_VERSION = 1;
 const STORE_NAME = "domains";
-const BATCH_SIZE = 5000;
+const BATCH_SIZE = 50000;
 
 interface DomainRecord {
   domain: string;

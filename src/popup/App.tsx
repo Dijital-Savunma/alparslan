@@ -90,6 +90,12 @@ export default function App() {
 
   // Fetch all popup data — re-runs when init becomes ready
   useEffect(() => {
+    // Restore persisted enabled state so the toggle reflects reality
+    // after closing and reopening the popup.
+    chrome.storage.sync.get("enabled", (result) => {
+      if (typeof result.enabled === "boolean") setEnabled(result.enabled);
+    });
+
     chrome.runtime.sendMessage({ type: "GET_STATS" }, (response: { stats: ExtensionStats } | null) => {
       if (response?.stats) setStats(response.stats);
     });
@@ -107,11 +113,11 @@ export default function App() {
       if (tabId) {
         chrome.runtime.sendMessage({ type: "GET_LIST_STATS", tabId }, (response: unknown) => {
           const r = response as {
-            blacklistSize?: number; whitelistSize?: number;
+            blacklistSize?: number; whitelistSize?: number; dynamicWhitelistSize?: number;
             tab?: { requestsChecked: number; threatsDetected: number; requestsBlocked: number; domains: string[]; threats: Array<{ domain: string; level: string; timestamp: number }> };
           } | null;
           if (r) {
-            setListStats({ blacklistSize: r.blacklistSize ?? 0, whitelistSize: r.whitelistSize ?? 0 });
+            setListStats({ blacklistSize: r.blacklistSize ?? 0, whitelistSize: (r.whitelistSize ?? 0) + (r.dynamicWhitelistSize ?? 0) });
             if (r.tab) setTabStats(r.tab);
           }
         });

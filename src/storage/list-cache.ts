@@ -1,4 +1,5 @@
 import type { BlacklistEntry } from "./types";
+import { logger } from "@/utils/logger";
 import {
   getAllWhitelist,
   getAllBlacklist,
@@ -24,10 +25,16 @@ export function isCacheReady(): boolean {
 export function isWhitelisted(domain: string): boolean {
   const d = domain.toLowerCase();
   if (whitelistSet.has(d)) return true;
-  // Check parent domain match (e.g. "sub.example.com" matches "example.com")
+  // Parent-domain match, capped at 3 labels. A whitelist entry must be
+  // a full host name with at least one dot — never a bare TLD or a
+  // compound public suffix. Stopping at `length - 2` leaves the last
+  // two parts intact (the effective TLD + SLD); stopping at `length - 3`
+  // would over-match. Candidates are whitelist entries with 3+ labels.
   const parts = d.split(".");
   for (let i = 1; i < parts.length - 1; i++) {
-    if (whitelistSet.has(parts.slice(i).join("."))) return true;
+    const candidate = parts.slice(i).join(".");
+    if (candidate.split(".").length < 2) break;
+    if (whitelistSet.has(candidate)) return true;
   }
   return false;
 }
@@ -91,7 +98,7 @@ async function runMigration(): Promise<void> {
   const migrated = await getMetadata("migrationV1Complete");
   if (migrated === true) return;
 
-  console.warn("[Alparslan] Running IndexedDB migration...");
+  logger.debug("Running IndexedDB migration...");
 
   // Migrate whitelist from chrome.storage.sync
   try {
@@ -107,10 +114,10 @@ async function runMigration(): Promise<void> {
           await idbAddWhitelist(d, "import");
         }
       }
-      console.warn(`[Alparslan] Migrated ${settings.whitelist.length} whitelist entries`);
+      logger.debug(`Migrated ${settings.whitelist.length} whitelist entries`);
     }
   } catch (err) {
-    console.warn("[Alparslan] Whitelist migration error:", err);
+    logger.warn("Whitelist migration error:", err);
   }
 
   // Load built-in blocklist into IndexedDB
@@ -128,14 +135,14 @@ async function runMigration(): Promise<void> {
       for (const entry of entries) {
         blacklistSet.add(entry.domain);
       }
-      console.warn(`[Alparslan] Migrated ${entries.length} blacklist entries`);
+      logger.debug(`Migrated ${entries.length} blacklist entries`);
     }
   } catch (err) {
-    console.warn("[Alparslan] Blacklist migration error:", err);
+    logger.warn("Blacklist migration error:", err);
   }
 
   await setMetadata("migrationV1Complete", true);
-  console.warn("[Alparslan] Migration complete");
+  logger.debug("Migration complete");
 }
 
 // --- Initialization ---
@@ -154,9 +161,9 @@ export async function initListCache(): Promise<void> {
     await runMigration();
 
     cacheReady = true;
-    console.warn(`[Alparslan] List cache ready: ${whitelistSet.size} whitelist, ${blacklistSet.size} blacklist`);
+    logger.debug(`List cache ready: ${whitelistSet.size} whitelist, ${blacklistSet.size} blacklist`);
   } catch (err) {
-    console.warn("[Alparslan] List cache init failed, using empty sets:", err);
+    logger.warn("List cache init failed, using empty sets:", err);
     cacheReady = true; // Still mark ready so the extension doesn't hang
   }
 }

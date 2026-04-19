@@ -49,6 +49,35 @@ export function createBloomFilter(
   return { bits, numHashes, numBits };
 }
 
+/**
+ * Async version that yields to the event loop every CHUNK_SIZE items.
+ * Prevents Firefox "extension not responding" during large list processing.
+ */
+export async function createBloomFilterAsync(
+  items: string[],
+  falsePositiveRate = 0.001,
+): Promise<BloomFilterData> {
+  const { numBits, numHashes } = optimalParams(items.length || 1, falsePositiveRate);
+  const bits = new Uint32Array(Math.ceil(numBits / 32));
+  const CHUNK_SIZE = 2000;
+
+  for (let start = 0; start < items.length; start += CHUNK_SIZE) {
+    const end = Math.min(start + CHUNK_SIZE, items.length);
+    for (let idx = start; idx < end; idx++) {
+      const lower = items[idx].toLowerCase();
+      for (let i = 0; i < numHashes; i++) {
+        const hash = fnv1a(lower, i) % numBits;
+        bits[hash >>> 5] |= 1 << (hash & 31);
+      }
+    }
+    if (end < items.length) {
+      await new Promise<void>((r) => setTimeout(r, 0));
+    }
+  }
+
+  return { bits, numHashes, numBits };
+}
+
 export function bloomFilterTest(filter: BloomFilterData, item: string): boolean {
   const lower = item.toLowerCase();
   for (let i = 0; i < filter.numHashes; i++) {

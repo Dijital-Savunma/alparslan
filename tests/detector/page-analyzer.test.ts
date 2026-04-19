@@ -55,6 +55,38 @@ describe("analyzePage", () => {
     expect(result.score).toBeGreaterThanOrEqual(30);
   });
 
+  it("should dedupe multiple forms posting to the same external host", () => {
+    const doc = createDocument(`
+      <form action="https://admin.shopify.com/a"><input type="text" /></form>
+      <form action="https://admin.shopify.com/b"><input type="text" /></form>
+      <form action="https://admin.shopify.com/c"><input type="text" /></form>
+    `);
+    const result = analyzePage(doc, "shopify.com");
+    const formReasons = result.reasons.filter((r) =>
+      r.includes("Form verisi farklı sunucuya gönderiliyor"),
+    );
+    expect(formReasons).toHaveLength(1);
+    expect(formReasons[0]).toContain("admin.shopify.com");
+    expect(formReasons[0]).toContain("(3 form)");
+    // Score counted once per unique host, not per form.
+    expect(result.score).toBe(30);
+  });
+
+  it("should list distinct external hosts separately", () => {
+    const doc = createDocument(`
+      <form action="https://a.example.org/x"><input /></form>
+      <form action="https://a.example.org/y"><input /></form>
+      <form action="https://b.example.org/z"><input /></form>
+    `);
+    const result = analyzePage(doc, "site.com");
+    const formReasons = result.reasons.filter((r) =>
+      r.includes("Form verisi farklı sunucuya gönderiliyor"),
+    );
+    expect(formReasons).toHaveLength(2);
+    expect(formReasons.some((r) => r.includes("a.example.org") && r.includes("(2 form)"))).toBe(true);
+    expect(formReasons.some((r) => r.includes("b.example.org") && !r.includes("form)"))).toBe(true);
+  });
+
   it("should not flag same-domain form actions", () => {
     const doc = createDocument(`
       <form action="https://example.com/login">

@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-firefox/
+dist-safari/
+Alparslan/
 *.zip
 *.log
 .DS_Store

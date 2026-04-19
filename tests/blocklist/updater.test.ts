@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchRemoteBlocklist, submitReport, setApiConfig, getApiConfig } from "@/blocklist/updater";
+import { fetchRemoteBlocklist, setApiConfig, getApiConfig } from "@/blocklist/updater";
 
 // Mock fetch globally
 const fetchMock = vi.fn();
@@ -14,7 +14,6 @@ describe("Blocklist Updater", () => {
     it("should return default config", () => {
       const config = getApiConfig();
       expect(config.listUrl).toContain("blocklist");
-      expect(config.reportUrl).toContain("dijitalsavunma");
       expect(config.updateIntervalMinutes).toBe(360);
     });
 
@@ -36,7 +35,8 @@ describe("Blocklist Updater", () => {
 
       const count = await fetchRemoteBlocklist();
       expect(count).toBe(2);
-      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("blocklist"));
+      // fetchTextWithLimit passes a second options arg (signal, cache, headers)
+      expect(fetchMock.mock.calls[0][0]).toEqual(expect.stringContaining("blocklist"));
     });
 
     it("should skip comments and empty lines in plain text", async () => {
@@ -86,55 +86,6 @@ describe("Blocklist Updater", () => {
 
       const count = await fetchRemoteBlocklist();
       expect(count).toBe(0);
-    });
-  });
-
-  describe("submitReport", () => {
-    it("should POST report to API", async () => {
-      fetchMock.mockResolvedValue({ ok: true });
-
-      const result = await submitReport({
-        domain: "phishing.com",
-        url: "https://phishing.com/login",
-        reportType: "dangerous",
-        description: "Fake bank login",
-      });
-
-      expect(result).toBe(true);
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining("reports"),
-        expect.objectContaining({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: expect.stringContaining("phishing.com"),
-        }),
-      );
-    });
-
-    it("should return false on API error", async () => {
-      fetchMock.mockResolvedValue({ ok: false, status: 500 });
-
-      const result = await submitReport({
-        domain: "test.com",
-        url: "https://test.com",
-        reportType: "safe",
-        description: "",
-      });
-
-      expect(result).toBe(false);
-    });
-
-    it("should return false on network failure", async () => {
-      fetchMock.mockRejectedValue(new Error("offline"));
-
-      const result = await submitReport({
-        domain: "test.com",
-        url: "https://test.com",
-        reportType: "dangerous",
-        description: "",
-      });
-
-      expect(result).toBe(false);
     });
   });
 });

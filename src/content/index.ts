@@ -50,7 +50,7 @@ function createWarningBanner(level: string, reason: string): void {
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         animation: slideDown 0.3s ease-out;
       }
-      .banner-content { display: flex; align-items: center; gap: 12px; flex: 1; }
+      .banner-content { display: contents; align-items: center; gap: 12px; flex: 1; }
       .banner-icon { font-size: 20px; }
       .banner-title { font-weight: 700; }
       .banner-reason { font-size: 12px; opacity: 0.9; margin-top: 2px; }
@@ -167,16 +167,15 @@ function runPageAnalysis(): void {
     if (currentUrl.startsWith("chrome") || currentUrl.startsWith("about:") || currentUrl.startsWith("moz-extension")) return;
 
     // Ask background to check this URL — content script is ready now
+    // Background waits for init (lists loaded) before responding, so we always get a correct result.
+    // Response includes showDomWarnings to avoid a separate GET_SETTINGS round-trip.
     chrome.runtime.sendMessage(
       { type: "CHECK_URL", url: currentUrl },
-      (response: { level?: string; reasons?: string[]; score?: number } | null) => {
+      (response: { level?: string; reasons?: string[]; score?: number; showDomWarnings?: boolean } | null) => {
         if (response && (response.level === "DANGEROUS" || response.level === "SUSPICIOUS")) {
-          // Check if DOM warnings are enabled
-          chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (settingsRes: { settings?: { showDomWarnings?: boolean } } | null) => {
-            if (settingsRes?.settings?.showDomWarnings !== false) {
-              createWarningBanner(response.level!, (response.reasons || []).join(", "));
-            }
-          });
+          if (response.showDomWarnings !== false) {
+            createWarningBanner(response.level!, (response.reasons || []).join(", "));
+          }
         }
       },
     );
@@ -231,4 +230,33 @@ if (document.readyState === "complete") {
   window.addEventListener("load", () => setTimeout(runPageAnalysis, 500));
 }
 
-export {};
+// SPA URL change detection — pushState/replaceState do not fire `load`,
+// so the content script would otherwise keep a stale verdict after
+// client-side navigation. We cannot patch the page's `history` API from
+// here: content scripts run in an isolated world, and property
+// assignments on shared DOM objects (like `history`) are not visible to
+// the page's own scripts. Injecting a patcher into the main world would
+// need `world: "MAIN"` (Firefox needs ≥128; our strict_min is 109) or a
+// web-accessible `<script>` payload. A 1 Hz poll is simpler, portable
+// across all supported browsers, and carries negligible runtime cost.
+let lastAnalyzedUrl = window.location.href;
+const URL_POLL_INTERVAL_MS = 1000;
+
+function onUrlMaybeChanged(): void {
+  if (window.location.href === lastAnalyzedUrl) return;
+  lastAnalyzedUrl = window.location.href;
+  bannerDismissed = false; // user-dismissal does not carry across URLs
+  // Tear down banners + re-attach observer from the previous URL —
+  // otherwise a stale warning persists when the new URL is SAFE, and
+  // the orphan observer can re-append a banner into the new page.
+  document.getElementById(BANNER_HOST_ID)?.remove();
+  document.getElementById(BREACH_BANNER_HOST_ID)?.remove();
+  if (bannerObserver) { bannerObserver.disconnect(); bannerObserver = null; }
+  runPageAnalysis();
+}
+
+// popstate / hashchange fire synchronously; the poll handles
+// pushState / replaceState performed by SPA routers.
+window.addEventListener("popstate", onUrlMaybeChanged);
+window.addEventListener("hashchange", onUrlMaybeChanged);
+setInterval(onUrlMaybeChanged, URL_POLL_INTERVAL_MS);

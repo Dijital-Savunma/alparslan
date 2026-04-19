@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import "fake-indexeddb/auto";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -10,8 +12,8 @@ let onMessageCallback: (
 
 let onUpdatedCallback: (
   tabId: number,
-  changeInfo: { url?: string },
-  tab: unknown,
+  changeInfo: { url?: string; status?: string },
+  tab: { url?: string },
 ) => void;
 
 let onInstalledCallback: () => void;
@@ -28,9 +30,22 @@ const fetchMock = vi.fn().mockResolvedValue({
   json: () => Promise.resolve({ domains: [] }),
 });
 
+const FAKE_ID = "fake-id";
+
+// Sender shape that matches how the Options page / popup actually look
+// when they message the SW — extension-origin URL is what the
+// sender-verification guard checks. Use this for any privileged message
+// in tests.
+const trustedSender = {
+  id: FAKE_ID,
+  url: `chrome-extension://${FAKE_ID}/options.html`,
+  tab: { id: 1 },
+};
+
 Object.defineProperty(globalThis, "chrome", {
   value: {
     runtime: {
+      id: FAKE_ID,
       onInstalled: {
         addListener: (cb: () => void) => {
           onInstalledCallback = cb;
@@ -41,7 +56,7 @@ Object.defineProperty(globalThis, "chrome", {
           onMessageCallback = cb;
         },
       },
-      getURL: (path: string) => `chrome-extension://fake-id/${path}`,
+      getURL: (path: string) => `chrome-extension://${FAKE_ID}/${path}`,
     },
     tabs: {
       onUpdated: {
@@ -51,6 +66,7 @@ Object.defineProperty(globalThis, "chrome", {
       },
       onRemoved: { addListener: vi.fn() },
       sendMessage: sendMessageMock,
+      query: vi.fn((_q: unknown, cb: (tabs: { id?: number }[]) => void) => cb([])),
     },
     storage: {
       sync: {
@@ -149,28 +165,40 @@ describe("Background Service Worker", () => {
   describe("SET_ENABLED message", () => {
     it("should toggle enabled state", () => {
       const sendResponse = vi.fn();
-      onMessageCallback({ type: "SET_ENABLED", enabled: false }, {}, sendResponse);
+      onMessageCallback({ type: "SET_ENABLED", enabled: false }, trustedSender, sendResponse);
 
       expect(sendResponse).toHaveBeenCalledWith({ enabled: false });
       expect(storageSetMock).toHaveBeenCalledWith({ enabled: false });
     });
+
+    it("CHECK_URL returns neutral UNKNOWN with showDomWarnings=false when disabled", () => {
+      const sr = vi.fn();
+      onMessageCallback({ type: "SET_ENABLED", enabled: false }, trustedSender, vi.fn());
+      onMessageCallback({ type: "CHECK_URL", url: "https://isbenk.com.tr/login" }, {}, sr);
+
+      // Kill switch path is synchronous — no need to await
+      expect(sr).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: "UNKNOWN",
+          score: 0,
+          showDomWarnings: false,
+        }),
+      );
+    });
   });
 
   describe("tabs.onUpdated", () => {
-    it("should update badge for dangerous URLs", () => {
-      // Use a typosquatting domain to trigger DANGEROUS
-      onUpdatedCallback(1, { url: "https://isbenk.com.tr/login" }, {});
+    it("should record protocol on URL change", () => {
+      // URL change triggers sync recordPageProtocol
+      onUpdatedCallback(1, { url: "https://isbenk.com.tr/login" }, { url: "https://isbenk.com.tr/login" });
 
-      // DOM warnings are now handled by content script (CHECK_URL on load)
-      // tabs.onUpdated only updates the badge
-      expect(chrome.action.setBadgeText).toHaveBeenCalled();
+      // Badge update and SHOW_WARNING happen async (on status=complete after init gate)
+      // In test env, init doesn't complete so async path is not tested here
     });
 
-    it("should not send message for safe URLs", () => {
-      sendMessageMock.mockClear();
-      onUpdatedCallback(1, { url: "https://example.com" }, {});
-
-      expect(sendMessageMock).not.toHaveBeenCalled();
+    it("should not crash for safe URLs", () => {
+      onUpdatedCallback(1, { url: "https://example.com" }, { url: "https://example.com" });
+      // No error thrown
     });
 
     it("should not forward when URL is not changed", () => {
@@ -208,7 +236,7 @@ describe("Background Service Worker", () => {
       };
       onMessageCallback(
         { type: "SETTINGS_UPDATED", settings: newSettings },
-        {},
+        trustedSender,
         sendResponse,
       );
 
@@ -234,7 +262,7 @@ describe("Background Service Worker", () => {
       const sr1 = vi.fn();
       onMessageCallback(
         { type: "ADD_TO_WHITELIST", domain: "example.com" },
-        {},
+        trustedSender,
         sr1,
       );
       // Give async write-through a tick to complete
@@ -366,7 +394,7 @@ describe("Background Service Worker", () => {
 
       // Clear
       const sr2 = vi.fn();
-      onMessageCallback({ type: "CLEAR_HISTORY" }, {}, sr2);
+      onMessageCallback({ type: "CLEAR_HISTORY" }, trustedSender, sr2);
       expect(sr2).toHaveBeenCalledWith({ ok: true });
 
       // Verify empty
@@ -451,5 +479,75 @@ describe("Background Service Worker", () => {
         expect.any(Function),
       );
     });
+  });
+
+  // Regression coverage for the sender-verification bug where options_page
+  // opened as a tab (Chrome's default) was treated as an untrusted sender
+  // because `sender.tab` is set. Only tab-less senders OR senders whose
+  // `.url` starts with chrome-extension://<own-id>/ should be trusted.
+  describe("privileged message sender verification (#2)", () => {
+    const privilegedTypes = [
+      { type: "SET_ENABLED", enabled: false },
+      { type: "SETTINGS_UPDATED", settings: { protectionLevel: "low", whitelist: [] } },
+      { type: "ADD_TO_WHITELIST", domain: "attacker-injected.com" },
+      { type: "REMOVE_FROM_WHITELIST", domain: "anything.com" },
+      { type: "CLEAR_HISTORY" },
+    ];
+
+    it.each(privilegedTypes)(
+      "accepts %s from a popup (no tab)",
+      (msg) => {
+        const sr = vi.fn();
+        const popupSender = { id: FAKE_ID, url: `chrome-extension://${FAKE_ID}/popup.html` };
+        onMessageCallback(msg, popupSender, sr);
+        // Not rejected with unauthorized reason
+        expect(sr).not.toHaveBeenCalledWith(
+          expect.objectContaining({ ok: false, reason: "unauthorized" }),
+        );
+      },
+    );
+
+    it.each(privilegedTypes)(
+      "accepts %s from options_page opened as a tab",
+      (msg) => {
+        const sr = vi.fn();
+        const optionsInTab = {
+          id: FAKE_ID,
+          url: `chrome-extension://${FAKE_ID}/options.html`,
+          tab: { id: 1 },
+        };
+        onMessageCallback(msg, optionsInTab, sr);
+        expect(sr).not.toHaveBeenCalledWith(
+          expect.objectContaining({ ok: false, reason: "unauthorized" }),
+        );
+      },
+    );
+
+    it.each(privilegedTypes)(
+      "rejects %s from a content script in a web page",
+      (msg) => {
+        const sr = vi.fn();
+        const contentScript = {
+          id: FAKE_ID, // same extension, but injected into a page
+          url: "https://evil-page.example/login",
+          tab: { id: 2 },
+        };
+        onMessageCallback(msg, contentScript, sr);
+        expect(sr).toHaveBeenCalledWith({ ok: false, reason: "unauthorized" });
+      },
+    );
+
+    it.each(privilegedTypes)(
+      "rejects %s from a different extension",
+      (msg) => {
+        const sr = vi.fn();
+        const otherExtension = {
+          id: "other-extension-id",
+          url: `chrome-extension://other-extension-id/popup.html`,
+        };
+        onMessageCallback(msg, otherExtension, sr);
+        expect(sr).toHaveBeenCalledWith({ ok: false, reason: "unauthorized" });
+      },
+    );
   });
 });

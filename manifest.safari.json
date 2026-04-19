@@ -31,10 +31,7 @@
   "permissions": [
     "activeTab",
     "storage",
-    "tabs",
-    "alarms",
-    "webRequest",
-    "declarativeNetRequest"
+    "tabs"
   ],
   "options_page": "options.html",
   "host_permissions": ["<all_urls>"],

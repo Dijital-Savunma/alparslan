@@ -73,13 +73,11 @@ export const HISTORY_DISPLAY_LIMIT = 50;
 
 export interface ApiConfig {
   listUrl: string;
-  reportUrl: string;
   updateIntervalMinutes: number;
 }
 
 export const DEFAULT_API_CONFIG: ApiConfig = {
   listUrl: "https://cdn.jsdelivr.net/gh/AsabiAlgo/blocklists@main/usom-blocklist.txt",
-  reportUrl: "https://api.dijitalsavunma.org/v1/reports",
   updateIntervalMinutes: 360, // 6 saat
 };
 

@@ -4,6 +4,7 @@
 [![Dijital Savunma](https://img.shields.io/badge/Dijital_Savunma-Açık_Kaynak-red?style=flat-square)](https://github.com/Dijital-Savunma)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Web_Store-yellow?style=flat-square)](#)
 [![Firefox Add-ons](https://img.shields.io/badge/Firefox-Add--ons-orange?style=flat-square)](#)
+[![Safari Extension](https://img.shields.io/badge/Safari-Extension-blue?style=flat-square)](#)
 
 > Güvenli tarayıcı eklentisi. Phishing ve dolandırıcılığa karşı en pratik kalkan.
 
@@ -31,6 +32,7 @@ Adını Anadolu'nun kapılarını açan Sultan Alparslan'dan alır — dijital d
 |-----------|----------|-------|
 | Google Chrome / Chromium | v3 | Destekleniyor |
 | Mozilla Firefox | v2 | Destekleniyor |
+| Safari (macOS) | v3 | Destekleniyor |
 | Microsoft Edge | v3 | Destekleniyor |
 | Brave | v3 | Destekleniyor |
 | Opera | v3 | Destekleniyor |
@@ -55,6 +57,9 @@ npm run build
 # Firefox için build
 npm run build:firefox
 
+# Safari için build
+npm run build:safari
+
 # Chrome'da:
 # 1. chrome://extensions adresine gidin
 # 2. "Geliştirici modu"nu açın
@@ -63,6 +68,13 @@ npm run build:firefox
 # Firefox'ta:
 # 1. about:debugging#/runtime/this-firefox adresine gidin
 # 2. "Geçici Eklenti Yükle" ile dist-firefox/manifest.json dosyasını seçin
+
+# Safari'de (macOS, Xcode gerekli):
+# 1. npm run build:safari
+# 2. xcrun safari-web-extension-converter dist-safari/ --app-name Alparslan --macos-only
+# 3. Xcode'da açılan projeyi build edin (Cmd+R)
+# 4. Safari > Ayarlar > Gelişmiş > "Geliştirme menüsünü göster" açın
+# 5. Geliştirme > İmzasız Eklentilere İzin Ver
 ```
 
 ### Paketleme
@@ -72,6 +84,9 @@ npm run package
 
 # Firefox .zip paketi
 npm run package:firefox
+
+# Safari .zip paketi
+npm run package:safari
 ```
 
 ## Teknik Altyapı
@@ -102,7 +117,8 @@ alparslan/
 ├── tests/                ← Test dosyaları (birim testler)
 ├── manifest.json         ← Chrome Manifest V3
 ├── manifest.firefox.json ← Firefox Manifest V2
-├── vite.config.ts        ← Build yapılandırması (Chrome + Firefox)
+├── manifest.safari.json  ← Safari Manifest V3
+├── vite.config.ts        ← Build yapılandırması (Chrome + Firefox + Safari)
 └── vitest.config.ts      ← Test yapılandırması
 ```
 

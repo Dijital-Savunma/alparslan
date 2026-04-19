@@ -7,9 +7,15 @@ declare global {
   var browser: typeof chrome | undefined;
 }
 
-if (typeof globalThis.chrome === "undefined" && typeof globalThis.browser !== "undefined") {
-  // Firefox: alias browser to chrome
+// Firefox provides both chrome (callback-based) and browser (Promise-based).
+// Always prefer browser for consistent Promise-based APIs (.catch() etc.)
+if (typeof globalThis.browser !== "undefined") {
   (globalThis as unknown as { chrome: typeof chrome }).chrome = globalThis.browser;
+}
+
+// Firefox MV2 uses browserAction, MV3 uses action — normalize to chrome.action
+if (typeof chrome !== "undefined" && !chrome.action && chrome.browserAction) {
+  (chrome as unknown as { action: typeof chrome.browserAction }).action = chrome.browserAction;
 }
 
 export {};

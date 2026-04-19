@@ -384,6 +384,27 @@ describe("Original detection still works (no regressions)", () => {
     expect(checkTyposquatting("randomsite.com").isSuspicious).toBe(false);
     expect(checkTyposquatting("mywebsite.org").isSuspicious).toBe(false);
   });
+
+  it("does NOT flag akbank.com (legit Akbank domain) as isbank typo", () => {
+    // akbank.com is in TRUSTED_DOMAINS. Without the fix, edit-distance 2
+    // against isbank.com.tr would have flagged it.
+    const result = checkTyposquatting("akbank.com");
+    expect(result.isSuspicious).toBe(false);
+  });
+
+  it("does NOT flag shopify.com as spotify.com typo", () => {
+    // Same length (7) + distance 2 = two substitutions of unrelated words,
+    // not a real typosquat.
+    const result = checkTyposquatting("shopify.com");
+    expect(result.isSuspicious).toBe(false);
+  });
+
+  it("does NOT flag distance-2 same-length unrelated brand names", () => {
+    // General regression: 2 substitutions in a same-length name are almost
+    // always unrelated words rather than typosquats.
+    expect(levenshteinDistance("akbank", "isbank")).toBe(2);
+    expect(levenshteinDistance("shopify", "spotify")).toBe(2);
+  });
 });
 
 // ─── FULL URL CHECK SCORING ──────────────────────────────────────

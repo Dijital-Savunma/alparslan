@@ -84,6 +84,47 @@ export function decodePunycodeDomain(domain: string): string {
     .join(".");
 }
 
+// Brand-operated first-party auxiliary domains. These are legitimately
+// owned and directly operated by the brand of another TRUSTED_DOMAINS
+// entry — e.g. `microsoftonline.com` is Microsoft's auth endpoint. The
+// name-containment rule in checkTyposquatting would otherwise flag them
+// as "contains trusted name" because "microsoftonline" contains
+// "microsoft". Explicitly trust them.
+//
+// IMPORTANT: only list domains where the entire root is directly served
+// by the brand. User-hostable PaaS/CDN roots (azurewebsites.net,
+// amazonaws.com, windows.net, googleusercontent.com) must NEVER appear
+// here — they would silently whitelist attacker-controlled subdomains
+// like `garantibank.azurewebsites.net`.
+const BRAND_SUBDOMAINS: ReadonlySet<string> = new Set([
+  // Microsoft — first-party auth / SaaS only
+  "microsoftonline.com",
+  "office.com",
+  "office365.com",
+  "sharepoint.com",
+  "msauth.net",
+  "msftauth.net",
+  "microsoft365.com",
+  // Google — first-party APIs and analytics (not user-content hosts)
+  "googleapis.com",
+  "gstatic.com",
+  "google-analytics.com",
+  "googletagmanager.com",
+  "googleadservices.com",
+  // Apple
+  "icloud-content.com",
+  // Amazon — ad-system only (NOT amazonaws.com: customer hosted)
+  "amazon-adsystem.com",
+  // Meta
+  "facebook.net",
+  "fbcdn.net",
+  "instagram.net",
+  "whatsapp.net",
+  // Cloudflare — first-party analytics / streaming
+  "cloudflareinsights.com",
+  "cloudflarestream.com",
+]);
+
 // Well-known trusted domains — phishing targets in Turkey + major global sites
 const TRUSTED_DOMAINS = new Set([
   // Turkey — government
@@ -97,6 +138,7 @@ const TRUSTED_DOMAINS = new Set([
   "isbank.com.tr",
   "garanti.com.tr",
   "akbank.com.tr",
+  "akbank.com",
   "yapikredi.com.tr",
   "halkbank.com.tr",
   "vakifbank.com.tr",
@@ -107,9 +149,18 @@ const TRUSTED_DOMAINS = new Set([
   "n11.com",
   "sahibinden.com",
   "yurticikargo.com",
-  "afrfrgo.com.tr",
+  "araskargo.com.tr",
   "mngkargo.com.tr",
   "sendeo.com.tr",
+  "dhl.com.tr",
+  // Turkey — retail & news (added to stop short-name typosquat FPs)
+  "a101.com.tr",
+  "bim.com.tr",
+  "sok.com.tr",
+  "migros.com.tr",
+  "ntv.com.tr",
+  "haberturk.com",
+  "cnnturk.com",
   // Global — search & services
   "google.com",
   "google.com.tr",
@@ -141,6 +192,7 @@ const TRUSTED_DOMAINS = new Set([
   // Global — other major
   "netflix.com",
   "spotify.com",
+  "shopify.com",
   "paypal.com",
   "cloudflare.com",
 ]);
@@ -265,6 +317,12 @@ export function checkTyposquatting(
   if (TRUSTED_DOMAINS.has(root)) {
     return { isSuspicious: false, similarTo: null, reason: null };
   }
+  // Brand-operated auxiliary domains (microsoftonline.com, googleapis.com …)
+  // — legitimately contain the brand name and must not trip the
+  // "contains-trusted-name" rule below.
+  if (BRAND_SUBDOMAINS.has(root)) {
+    return { isSuspicious: false, similarTo: null, reason: null };
+  }
 
   const rawName = extractName(root);
   const normalizedName = normalizeHomoglyphs(rawName);
@@ -294,9 +352,17 @@ export function checkTyposquatting(
       };
     }
 
-    // Check 2: Damerau-Levenshtein distance ≤ 2 (classic typosquatting)
+    // Check 2: Damerau-Levenshtein distance (classic typosquatting).
+    // For names ≤ 4 chars, ANY distance of 1 is too loose — unrelated
+    // 3-letter acronyms (sok vs sgk, bim vs bing, ntv vs ptt) are almost
+    // never typos of each other. Skip short-name distance checks and rely
+    // on exact-name / homoglyph paths instead.
+    // For ≥ 5 chars, distance 1 or (distance 2 with length diff) are the
+    // canonical typo shapes.
     const distance = levenshteinDistance(strippedName, strippedTrustedName);
-    if (distance > 0 && distance <= 2) {
+    const lenDiff = Math.abs(strippedName.length - strippedTrustedName.length);
+    const shortName = strippedTrustedName.length <= 4 || strippedName.length <= 4;
+    if (!shortName && (distance === 1 || (distance === 2 && lenDiff >= 1))) {
       return {
         isSuspicious: true,
         similarTo: trusted,

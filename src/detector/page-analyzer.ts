@@ -49,7 +49,9 @@ export function analyzePage(document: Document, currentDomain: string): PageAnal
     }
   }
 
-  // Check form actions
+  // Check form actions — dedupe by hostname so 10 forms posting to the
+  // same admin endpoint produce one reason, not ten.
+  const externalHostCounts = new Map<string, number>();
   for (const form of forms) {
     const action = form.getAttribute("action") || "";
     if (action && action.startsWith("http")) {
@@ -58,14 +60,20 @@ export function analyzePage(document: Document, currentDomain: string): PageAnal
         if (actionUrl.hostname !== currentDomain) {
           suspiciousFormAction = true;
           externalFormAction = actionUrl.hostname;
-          score += 30;
-          reasons.push(t.analysis.externalFormAction(actionUrl.hostname));
+          externalHostCounts.set(
+            actionUrl.hostname,
+            (externalHostCounts.get(actionUrl.hostname) ?? 0) + 1,
+          );
         }
       } catch {
         // Invalid URL in action, slightly suspicious
         score += 5;
       }
     }
+  }
+  for (const [hostname, count] of externalHostCounts) {
+    score += 30;
+    reasons.push(t.analysis.externalFormAction(hostname, count));
   }
 
   // Check for TC Kimlik / TCKN patterns
