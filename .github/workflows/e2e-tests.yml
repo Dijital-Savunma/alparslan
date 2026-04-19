@@ -44,8 +44,14 @@ jobs:
       # (required for MV3 extension loading). xvfb-run provides a
       # virtual X display so the browser can start without a physical
       # screen on GitHub-hosted runners.
+      #
+      # --max-failures=5 aborts after 5 test failures — a known-broken
+      # baseline doesn't burn the full 20-min timeout budget.
+      # --retries=0 skips the 60 s retry on every failing test; retries
+      # did not change the failure set in observed runs, only inflated
+      # wall time by ~3 min. Flaky tests should be fixed at the source.
       - name: Run Playwright tests
-        run: xvfb-run --auto-servernum -- npx playwright test --config e2e/playwright.config.ts
+        run: xvfb-run --auto-servernum -- npx playwright test --config e2e/playwright.config.ts --max-failures=5 --retries=0
 
       - name: Upload Playwright report
         if: always()
