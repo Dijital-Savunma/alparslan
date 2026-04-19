@@ -2,8 +2,8 @@
 
 [![Lisans: MIT](https://img.shields.io/badge/Lisans-MIT-blue?style=flat-square)](LICENSE)
 [![Dijital Savunma](https://img.shields.io/badge/Dijital_Savunma-Açık_Kaynak-red?style=flat-square)](https://github.com/Dijital-Savunma)
-[![Chrome Web Store](https://img.shields.io/badge/Chrome-Web_Store-yellow?style=flat-square)](#)
-[![Firefox Add-ons](https://img.shields.io/badge/Firefox-Add--ons-orange?style=flat-square)](#)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-Web_Store-yellow?style=flat-square)](https://chromewebstore.google.com/detail/hgifmpfbaipmfbdaoihinpodjppkbaci)
+[![Firefox Add-ons](https://img.shields.io/badge/Firefox-Add--ons-orange?style=flat-square)](https://addons.mozilla.org/firefox/addon/alparslan/)
 [![Safari Extension](https://img.shields.io/badge/Safari-Extension-blue?style=flat-square)](#)
 
 > Güvenli tarayıcı eklentisi. Phishing ve dolandırıcılığa karşı en pratik kalkan.
@@ -39,8 +39,11 @@ Adını Anadolu'nun kapılarını açan Sultan Alparslan'dan alır — dijital d
 
 ## Kurulum
 
-### Chrome Web Store'dan (yakında)
-Chrome Web Store'da "Alparslan" arayın ve "Ekle" butonuna tıklayın.
+### Mağazadan (önerilen)
+
+- **Chrome / Edge / Brave / Opera:** [Chrome Web Store](https://chromewebstore.google.com/detail/hgifmpfbaipmfbdaoihinpodjppkbaci) → **Ekle**
+- **Firefox:** [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/alparslan/) → **Firefox'a Ekle**
+- **Safari:** Yakında
 
 ### Geliştirici Modu (Manuel)
 ```bash
@@ -94,7 +97,7 @@ npm run package:safari
 - **Dil:** TypeScript
 - **UI:** React 18
 - **Build:** Vite 5
-- **Test:** Vitest
+- **Test:** Vitest (birim) + Playwright (E2E)
 - **Lint:** ESLint + Prettier
 
 ## Mimari
@@ -152,7 +155,7 @@ npm run format
 
 ## Katkıda Bulunma
 
-Katkılarınızı bekliyoruz! [Katkı rehberimizi](https://github.com/Dijital-Savunma/.github/blob/main/CONTRIBUTING.md) inceleyin.
+Katkılarınızı bekliyoruz! [Katkı rehberimizi](CONTRIBUTING.md) inceleyin.
 
 Özellikle şu alanlarda katkıya ihtiyacımız var:
 - Türkiye'ye özgü phishing sitelerinin raporlanması
