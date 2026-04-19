@@ -5,6 +5,7 @@ import { checkUrl, extractDomain, extractRootDomain } from "@/detector/url-check
 import { getCachedResult, setCachedResult, startPeriodicCleanup, stopPeriodicCleanup } from "./url-check-cache";
 import { addDnrBlockRule, syncDnrRulesWithBlacklist, clearAllDnrRules } from "./dnr-manager";
 import { getAllBlacklist } from "@/storage/idb";
+import { logger } from "@/utils/logger";
 
 interface MonitoringStats {
   requestsChecked: number;
@@ -148,7 +149,7 @@ function onBeforeRequest(details: chrome.webRequest.WebRequestBodyDetails): chro
     setCachedResult(domain, result);
 
     if (elapsed > 5) {
-      console.warn(`[Alparslan] URL check took ${elapsed.toFixed(1)}ms for ${domain}`);
+      logger.debug(`URL check took ${elapsed.toFixed(1)}ms for ${domain}`);
     }
 
     if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
@@ -180,14 +181,14 @@ export function updateMonitoringSettings(settings: ExtensionSettings): void {
   if (settings.networkBlockingEnabled && !wasBlocking && !IS_FIREFOX) {
     getAllBlacklist()
       .then((entries) => syncDnrRulesWithBlacklist(entries.map((e) => e.domain)))
-      .catch((err) => console.warn("[Alparslan] DNR sync on enable failed:", err));
-    console.warn("[Alparslan] Blocking enabled — syncing DNR rules");
+      .catch((err) => logger.warn("DNR sync on enable failed:", err));
+    logger.debug("Blocking enabled — syncing DNR rules");
   }
 
   // If blocking was just turned OFF, clear all DNR rules
   if (!settings.networkBlockingEnabled && wasBlocking) {
     clearAllDnrRules();
-    console.warn("[Alparslan] Blocking disabled — clearing DNR rules");
+    logger.debug("Blocking disabled — clearing DNR rules");
   }
 }
 
@@ -199,7 +200,7 @@ export function startRequestMonitoring(settings: ExtensionSettings): void {
 
   // Register webRequest listener (guard against missing API in test environments)
   if (!chrome.webRequest?.onBeforeRequest) {
-    console.warn("[Alparslan] webRequest API not available");
+    logger.warn("webRequest API not available");
     return;
   }
 
@@ -219,14 +220,14 @@ export function startRequestMonitoring(settings: ExtensionSettings): void {
     if (settings.networkBlockingEnabled) {
       getAllBlacklist()
         .then((entries) => syncDnrRulesWithBlacklist(entries.map((e) => e.domain)))
-        .catch((err) => console.warn("[Alparslan] DNR sync failed:", err));
+        .catch((err) => logger.warn("DNR sync failed:", err));
     } else {
       // Clear any leftover DNR rules from previous sessions
       clearAllDnrRules();
     }
   }
 
-  console.warn("[Alparslan] Network request monitoring started");
+  logger.debug("Network request monitoring started");
 }
 
 export function stopRequestMonitoring(): void {
@@ -241,7 +242,7 @@ export function stopRequestMonitoring(): void {
   // Clear DNR rules when monitoring is stopped
   clearAllDnrRules();
 
-  console.warn("[Alparslan] Network request monitoring stopped");
+  logger.debug("Network request monitoring stopped");
 }
 
 export function getMonitoringStats(): MonitoringStats {

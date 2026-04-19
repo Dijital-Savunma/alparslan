@@ -2,6 +2,8 @@
 import { type ApiConfig, DEFAULT_API_CONFIG } from "@/utils/types";
 import { addToBlacklist } from "@/storage/list-cache";
 import type { BlacklistEntry } from "@/storage/types";
+import { logger } from "@/utils/logger";
+import { fetchTextWithLimit, FETCH_LIMITS } from "@/utils/safe-fetch";
 
 const ALARM_NAME = "alparslan-list-update";
 
@@ -54,20 +56,12 @@ function parseDomains(text: string, contentType: string): string[] {
 export async function fetchRemoteBlocklist(): Promise<number> {
   const t0 = Date.now();
   try {
-    console.warn(`[Alparslan] Fetching blocklist from: ${config.listUrl}`);
-    const response = await fetch(config.listUrl);
-    const fetchMs = Date.now() - t0;
-
-    if (!response.ok) {
-      console.warn(`[Alparslan] List update failed: HTTP ${response.status} (${fetchMs}ms)`);
-      return -1;
-    }
-
-    const contentType = response.headers.get("content-type") || "";
-    const text = await response.text();
+    logger.debug(`Fetching blocklist from: ${config.listUrl}`);
+    const { text, contentType, bytes } = await fetchTextWithLimit(config.listUrl, {
+      maxBytes: FETCH_LIMITS.remoteBlocklist,
+    });
     const downloadMs = Date.now() - t0;
-    const sizeKb = (text.length / 1024).toFixed(1);
-    console.warn(`[Alparslan] Blocklist downloaded: ${sizeKb}KB in ${downloadMs}ms (content-type: ${contentType})`);
+    logger.debug(`Blocklist downloaded: ${(bytes / 1024).toFixed(1)}KB in ${downloadMs}ms (content-type: ${contentType})`);
 
     const domains = parseDomains(text, contentType);
     const parseMs = Date.now() - t0 - downloadMs;
@@ -82,15 +76,15 @@ export async function fetchRemoteBlocklist(): Promise<number> {
       }));
       await addToBlacklist(entries);
       const totalMs = Date.now() - t0;
-      console.warn(`[Alparslan] Remote list updated: ${domains.length} domains (download: ${downloadMs}ms, parse: ${parseMs}ms, save: ${totalMs - downloadMs - parseMs}ms, total: ${totalMs}ms)`);
+      logger.debug(`Remote list updated: ${domains.length} domains (download: ${downloadMs}ms, parse: ${parseMs}ms, save: ${totalMs - downloadMs - parseMs}ms, total: ${totalMs}ms)`);
     } else {
-      console.warn(`[Alparslan] Remote list empty or could not parse (${text.length} bytes, content-type: ${contentType})`);
+      logger.warn(`Remote list empty or could not parse (${text.length} bytes, content-type: ${contentType})`);
     }
 
     return domains.length;
   } catch (err) {
     const elapsed = Date.now() - t0;
-    console.warn(`[Alparslan] List update error after ${elapsed}ms:`, err);
+    logger.warn(`List update error after ${elapsed}ms:`, err);
     return -1;
   }
 }

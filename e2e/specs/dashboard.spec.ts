@@ -5,7 +5,7 @@ test.describe("Dashboard Score — Happy Path", () => {
   test("should show score with no browsing activity", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByText("Skor").click();
-    await expect(popup.getByText("Haftalik Guvenlik Skoru")).toBeVisible();
+    await expect(popup.getByText("Haftalık Güvenlik Skoru")).toBeVisible();
     await popup.close();
   });
 
@@ -13,7 +13,7 @@ test.describe("Dashboard Score — Happy Path", () => {
     const popup = await openPopup(context, extensionId);
     await popup.getByText("Skor").click();
     // Wait for dashboard to load (loading state shows "Yukleniyor...")
-    await expect(popup.getByText("Haftalik Guvenlik Skoru")).toBeVisible({ timeout: 10000 });
+    await expect(popup.getByText("Haftalık Güvenlik Skoru")).toBeVisible({ timeout: 10000 });
     await expect(popup.getByText("HTTPS").first()).toBeVisible();
     await expect(popup.getByText("Tehdit").first()).toBeVisible();
     await expect(popup.getByText("Aktivite")).toBeVisible();
@@ -24,7 +24,7 @@ test.describe("Dashboard Score — Happy Path", () => {
   test("should show tips for new user", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByText("Skor").click();
-    await expect(popup.getByText("Oneriler")).toBeVisible();
+    await expect(popup.getByText("Öneriler")).toBeVisible();
     await popup.close();
   });
 
@@ -79,7 +79,7 @@ test.describe("Dashboard Score — Negative Scenarios", () => {
     await popup.getByText("Aktif").click();
     await popup.waitForTimeout(300);
     await popup.getByText("Skor").click();
-    await expect(popup.getByText("Haftalik Guvenlik Skoru")).toBeVisible();
+    await expect(popup.getByText("Haftalık Güvenlik Skoru")).toBeVisible();
     await popup.close();
   });
 });

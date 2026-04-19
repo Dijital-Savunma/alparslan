@@ -15,6 +15,7 @@ import type { BlacklistEntry } from "@/storage/types";
 import { startRequestMonitoring, stopRequestMonitoring, updateMonitoringSettings, getMonitoringStats, getTabMonitoringStats, clearTabStats } from "@/network/request-monitor";
 import { setTtlMinutes } from "@/network/url-check-cache";
 import t from "@/i18n/tr";
+import { logger } from "@/utils/logger";
 
 interface ExtensionState {
   enabled: boolean;
@@ -40,9 +41,27 @@ function persistStats(): void {
   chrome.storage.sync.set({ stats: state.stats });
 }
 
+/**
+ * Drops query string + fragment before persisting a URL.
+ * Scan history and site reports would otherwise leak password-reset
+ * tokens, OAuth codes, magic-link credentials, and similar
+ * query-string secrets into chrome.storage.local.
+ */
+function sanitizeUrlForStorage(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.origin + u.pathname;
+  } catch {
+    // Not a parseable URL — fall back to the domain or empty string
+    // rather than emitting the raw value, which may itself be noise.
+    return extractDomain(url) ?? "";
+  }
+}
+
 function addHistoryEntry(url: string, level: string, score: number): void {
-  const domain = extractDomain(url) || url;
-  state.history.unshift({ url, domain, level: level as ScanHistoryEntry["level"], score, checkedAt: Date.now() });
+  const safeUrl = sanitizeUrlForStorage(url);
+  const domain = extractDomain(url) || safeUrl;
+  state.history.unshift({ url: safeUrl, domain, level: level as ScanHistoryEntry["level"], score, checkedAt: Date.now() });
   if (state.history.length > MAX_HISTORY_ENTRIES) {
     state.history = state.history.slice(0, MAX_HISTORY_ENTRIES);
   }
@@ -54,6 +73,21 @@ function addHistoryEntry(url: string, level: string, score: number): void {
 let initDone = false;
 let resolveInit: () => void;
 const initReady = new Promise<void>((resolve) => { resolveInit = resolve; });
+
+// Testing hook: readiness flags that e2e fixtures poll for before running
+// assertions. Flipped in-place as init steps finish. Negligible cost at
+// runtime; unused in production if nothing reads them.
+interface E2EReadiness {
+  swInitDone: boolean;
+  blocklistLoaded: boolean;
+  breachLoaded: boolean;
+}
+const e2eReadiness: E2EReadiness = {
+  swInitDone: false,
+  blocklistLoaded: false,
+  breachLoaded: false,
+};
+(globalThis as typeof globalThis & { __alparslanE2E?: E2EReadiness }).__alparslanE2E = e2eReadiness;
 
 // Debug timing state
 const initTimings: Record<string, number> = { _startedAt: Date.now() };
@@ -115,11 +149,19 @@ async function initServiceWorker(): Promise<void> {
     state.stats = { ...DEFAULT_STATS, ...(syncResult.stats as ExtensionStats) };
   }
   if (syncResult.reports) {
-    state.reports = syncResult.reports as SiteReport[];
+    // Strip legacy query/fragment from pre-sanitise reports that were
+    // written before this version.
+    state.reports = (syncResult.reports as SiteReport[]).map((r) => ({
+      ...r,
+      url: sanitizeUrlForStorage(r.url),
+    }));
   }
   // History is stored in local (no sync size limit)
   if (localResult.history) {
-    state.history = localResult.history as ScanHistoryEntry[];
+    state.history = (localResult.history as ScanHistoryEntry[]).map((e) => ({
+      ...e,
+      url: sanitizeUrlForStorage(e.url),
+    }));
   }
 
   // Step 2: Init blacklist cache from IndexedDB
@@ -143,13 +185,13 @@ async function initServiceWorker(): Promise<void> {
   initTimings.usomWhitelistBreach = t2end;
 
   updateProgress(2, t2end); // USOM
-  if (usomResult.status === "rejected") console.warn("[Alparslan] USOM init failed:", usomResult.reason);
+  if (usomResult.status === "rejected") logger.warn("USOM init failed:", usomResult.reason);
 
   updateProgress(3, t2end); // Whitelist
-  if (wlResult.status === "rejected") console.warn("[Alparslan] Whitelist init failed:", wlResult.reason);
+  if (wlResult.status === "rejected") logger.warn("Whitelist init failed:", wlResult.reason);
 
   updateProgress(4, t2end); // Breach
-  if (breachResult.status === "rejected") console.warn("[Alparslan] Breach init failed:", breachResult.reason);
+  if (breachResult.status === "rejected") logger.warn("Breach init failed:", breachResult.reason);
 
   // Set URL check cache TTL from settings
   setTtlMinutes(state.settings.urlCacheTtlMinutes);
@@ -164,8 +206,9 @@ async function initServiceWorker(): Promise<void> {
   initProgress.step = t.init.ready;
   initProgress.percent = 100;
   initDone = true;
+  e2eReadiness.swInitDone = true;
   resolveInit();
-  console.warn(`[Alparslan] Service worker initialized in ${initTimings.total}ms (storage: ${initTimings.storageLoad}ms, cache: ${initTimings.cacheInit}ms)`);
+  logger.debug(`Service worker initialized in ${initTimings.total}ms (storage: ${initTimings.storageLoad}ms, cache: ${initTimings.cacheInit}ms)`);
 
   // Re-scan all open tabs now that lists are loaded
   chrome.tabs.query({}, (tabs) => {
@@ -191,11 +234,11 @@ async function initServiceWorker(): Promise<void> {
 }
 
 initServiceWorker().catch((err) => {
-  console.warn("[Alparslan] Service worker init error:", err);
+  logger.warn("Service worker init error:", err);
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.warn("[Alparslan] Extension installed");
+  logger.debug("Extension installed");
 
   // Clear any leftover DNR block rules from previous version
   if (chrome.declarativeNetRequest?.getDynamicRules) {
@@ -203,7 +246,7 @@ chrome.runtime.onInstalled.addListener(() => {
       const blockRuleIds = rules.filter((r) => r.id >= 1000).map((r) => r.id);
       if (blockRuleIds.length > 0) {
         chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: blockRuleIds });
-        console.warn(`[Alparslan] Cleared ${blockRuleIds.length} leftover DNR rules`);
+        logger.debug(`Cleared ${blockRuleIds.length} leftover DNR rules`);
       }
     }).catch(() => {});
   }
@@ -221,10 +264,13 @@ chrome.runtime.onInstalled.addListener(() => {
       return addToBlacklist(entries);
     })
     .then(() => {
-      console.warn("[Alparslan] Built-in blocklist loaded into IndexedDB");
+      logger.debug("Built-in blocklist loaded into IndexedDB");
+      e2eReadiness.blocklistLoaded = true;
     })
     .catch(() => {
-      console.warn("[Alparslan] Could not load blocklist");
+      logger.warn("Could not load blocklist");
+      // Still mark ready so e2e fixture doesn't hang on transient failures.
+      e2eReadiness.blocklistLoaded = true;
     });
 
   // Schedule periodic list updates (USOM + whitelist + remote blocklist)
@@ -238,17 +284,54 @@ chrome.runtime.onInstalled.addListener(() => {
     .then((r) => r.json())
     .then((data: { breaches: BreachEntry[] }) => {
       return loadBreachDB(data.breaches).then(() => {
-        console.warn("[Alparslan] Breach DB stored in IndexedDB: " + String(data.breaches.length) + " entries");
+        logger.debug("Breach DB stored in IndexedDB: " + String(data.breaches.length) + " entries");
+        e2eReadiness.breachLoaded = true;
       });
     })
     .catch(() => {
-      console.warn("[Alparslan] Could not load breach database");
+      logger.warn("Could not load breach database");
+      // Still mark ready so e2e fixture doesn't hang on transient failures.
+      e2eReadiness.breachLoaded = true;
     });
 
 });
 
+// Message types that mutate extension state. They are only accepted from
+// extension-own pages (popup, options). Content scripts should never be
+// able to flip protection level, toggle the kill-switch, or mutate the
+// whitelist on the user's behalf. A content script has `sender.tab` set;
+// an extension page does not.
+const PRIVILEGED_MESSAGE_TYPES = new Set([
+  "SET_ENABLED",
+  "SETTINGS_UPDATED",
+  "ADD_TO_WHITELIST",
+  "REMOVE_FROM_WHITELIST",
+  "CLEAR_HISTORY",
+]);
+
+function isFromExtensionPage(sender: chrome.runtime.MessageSender): boolean {
+  if (sender.id !== chrome.runtime.id) return false;
+  // Popup windows, SW, etc. have no `.tab`.
+  if (sender.tab === undefined) return true;
+  // Extension pages opened as tabs (options_page default) DO set `.tab`, but
+  // their `.url` starts with `chrome-extension://<own-id>/`. Content scripts
+  // injected into web pages also have `.tab` set, but `.url` is the host
+  // page URL — not our extension origin.
+  const ownOrigin = `chrome-extension://${chrome.runtime.id}/`;
+  return sender.url?.startsWith(ownOrigin) ?? false;
+}
+
 chrome.runtime.onMessage.addListener(
-  (message: Message, _sender, sendResponse) => {
+  (message: Message, sender, sendResponse) => {
+    if (PRIVILEGED_MESSAGE_TYPES.has(message.type) && !isFromExtensionPage(sender)) {
+      // Don't include sender.url in prod logger.warn — it's a page URL
+      // and the logger contract keeps PII out of end-user consoles.
+      logger.warn("Rejected privileged message:", message.type);
+      logger.debug("Rejected sender url:", sender.url);
+      sendResponse({ ok: false, reason: "unauthorized" });
+      return true;
+    }
+
     if (message.type === "PING") {
       sendResponse({ type: "PONG", timestamp: Date.now() });
       return true;
@@ -359,14 +442,14 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === "ADD_TO_WHITELIST") {
       const domain = message.domain as string;
-      addToWhitelist(domain).catch((err) => console.warn("[Alparslan] Whitelist add error:", err));
+      addToWhitelist(domain).catch((err) => logger.warn("Whitelist add error:", err));
       sendResponse({ ok: true });
       return true;
     }
 
     if (message.type === "REMOVE_FROM_WHITELIST") {
       const domain = message.domain as string;
-      removeFromWhitelist(domain).catch((err) => console.warn("[Alparslan] Whitelist remove error:", err));
+      removeFromWhitelist(domain).catch((err) => logger.warn("Whitelist remove error:", err));
       sendResponse({ ok: true });
       return true;
     }
@@ -406,12 +489,22 @@ chrome.runtime.onMessage.addListener(
         sendResponse({ ok: false, reason: "already_reported" });
         return true;
       }
+      // Rate-limit to prevent a loop in the UI / buggy caller from
+      // filling chrome.storage.sync (which has a fixed quota).
+      const hourAgo = Date.now() - 60 * 60 * 1000;
+      const reportsLastHour = state.reports.filter((r) => r.reportedAt >= hourAgo).length;
+      if (reportsLastHour >= 10) {
+        sendResponse({ ok: false, reason: "rate_limited" });
+        return true;
+      }
       const reportType = message.reportType as "dangerous" | "safe";
       const description = (message.description as string) || "";
       const url = message.url as string;
       const report: SiteReport = {
         domain,
-        url,
+        // Sanitize — reports are persisted; keep them free of
+        // query/fragment secrets.
+        url: sanitizeUrlForStorage(url),
         reportType,
         description,
         reportedAt: Date.now(),

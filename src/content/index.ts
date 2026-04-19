@@ -229,3 +229,34 @@ if (document.readyState === "complete") {
 } else {
   window.addEventListener("load", () => setTimeout(runPageAnalysis, 500));
 }
+
+// SPA URL change detection — pushState/replaceState do not fire `load`,
+// so the content script would otherwise keep a stale verdict after
+// client-side navigation. We cannot patch the page's `history` API from
+// here: content scripts run in an isolated world, and property
+// assignments on shared DOM objects (like `history`) are not visible to
+// the page's own scripts. Injecting a patcher into the main world would
+// need `world: "MAIN"` (Firefox needs ≥128; our strict_min is 109) or a
+// web-accessible `<script>` payload. A 1 Hz poll is simpler, portable
+// across all supported browsers, and carries negligible runtime cost.
+let lastAnalyzedUrl = window.location.href;
+const URL_POLL_INTERVAL_MS = 1000;
+
+function onUrlMaybeChanged(): void {
+  if (window.location.href === lastAnalyzedUrl) return;
+  lastAnalyzedUrl = window.location.href;
+  bannerDismissed = false; // user-dismissal does not carry across URLs
+  // Tear down banners + re-attach observer from the previous URL —
+  // otherwise a stale warning persists when the new URL is SAFE, and
+  // the orphan observer can re-append a banner into the new page.
+  document.getElementById(BANNER_HOST_ID)?.remove();
+  document.getElementById(BREACH_BANNER_HOST_ID)?.remove();
+  if (bannerObserver) { bannerObserver.disconnect(); bannerObserver = null; }
+  runPageAnalysis();
+}
+
+// popstate / hashchange fire synchronously; the poll handles
+// pushState / replaceState performed by SPA routers.
+window.addEventListener("popstate", onUrlMaybeChanged);
+window.addEventListener("hashchange", onUrlMaybeChanged);
+setInterval(onUrlMaybeChanged, URL_POLL_INTERVAL_MS);

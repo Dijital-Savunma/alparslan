@@ -11,15 +11,15 @@ test.describe("Options Page — Happy Path", () => {
   test("should show protection level settings", async ({ context, extensionId }) => {
     const options = await openOptionsPage(context, extensionId);
     await expect(options.getByText("Koruma Seviyesi")).toBeVisible();
-    await expect(options.getByText("Dusuk")).toBeVisible();
+    await expect(options.getByText("Düşük")).toBeVisible();
     await expect(options.getByText("Orta")).toBeVisible();
-    await expect(options.getByText("Yuksek")).toBeVisible();
+    await expect(options.getByText("Yüksek")).toBeVisible();
     await options.close();
   });
 
   test("should allow changing protection level", async ({ context, extensionId }) => {
     const options = await openOptionsPage(context, extensionId);
-    await options.getByText("Yuksek").click();
+    await options.getByText("Yüksek").click();
     await expect(options.getByText("Ayarlar kaydedildi")).toBeVisible({ timeout: 3000 });
     await options.close();
   });
@@ -28,7 +28,7 @@ test.describe("Options Page — Happy Path", () => {
     const options = await openOptionsPage(context, extensionId);
     // Wait for the page to fully render
     await expect(options.getByRole("heading", { name: "Beyaz Liste" })).toBeVisible({ timeout: 5000 });
-    const input = options.getByPlaceholder("ornek: example.com");
+    const input = options.getByPlaceholder("örnek: example.com");
     await expect(input).toBeVisible();
     await input.fill("test-safe-site.com");
     await options.getByRole("button", { name: "Ekle" }).click();
@@ -54,17 +54,17 @@ test.describe("Options Page — Negative Scenarios", () => {
     // Wait for the page to fully render
     await expect(options.getByRole("heading", { name: "Beyaz Liste" })).toBeVisible({ timeout: 5000 });
     // Verify whitelist is empty initially
-    await expect(options.getByText("Beyaz liste bos")).toBeVisible();
+    await expect(options.getByText("Beyaz liste boş")).toBeVisible();
     // Click Ekle with empty input
     await options.getByRole("button", { name: "Ekle" }).click();
     // Whitelist should still be empty
-    await expect(options.getByText("Beyaz liste bos")).toBeVisible();
+    await expect(options.getByText("Beyaz liste boş")).toBeVisible();
     await options.close();
   });
 
   test("negative: should handle data clear gracefully", async ({ context, extensionId }) => {
     const options = await openOptionsPage(context, extensionId);
-    await options.getByText("Tum Verileri Temizle").click();
+    await options.getByText("Tüm Verileri Temizle").click();
     await expect(options.getByText("Veriler temizlendi")).toBeVisible({ timeout: 3000 });
     await expect(options.getByText("Koruma Seviyesi")).toBeVisible();
     await options.close();

@@ -35,7 +35,8 @@ describe("Blocklist Updater", () => {
 
       const count = await fetchRemoteBlocklist();
       expect(count).toBe(2);
-      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("blocklist"));
+      // fetchTextWithLimit passes a second options arg (signal, cache, headers)
+      expect(fetchMock.mock.calls[0][0]).toEqual(expect.stringContaining("blocklist"));
     });
 
     it("should skip comments and empty lines in plain text", async () => {
