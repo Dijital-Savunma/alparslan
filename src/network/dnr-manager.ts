@@ -1,5 +1,6 @@
 // DeclarativeNetRequest rule manager for blocking dangerous domains
 // Rule IDs: 1000+ range (tracker rules in privacy/ use 1-20)
+import { logger } from "@/utils/logger";
 
 const RULE_ID_OFFSET = 1000;
 const activeRules = new Map<string, number>(); // domain -> ruleId
@@ -47,7 +48,7 @@ export async function addDnrBlockRule(domain: string): Promise<void> {
     });
   } catch (err) {
     activeRules.delete(domain);
-    console.warn("[Alparslan] DNR rule add failed:", domain, err);
+    logger.warn("DNR rule add failed:", domain, err);
   }
 }
 
@@ -64,7 +65,7 @@ export async function removeDnrBlockRule(domain: string): Promise<void> {
       removeRuleIds: [ruleId],
     });
   } catch (err) {
-    console.warn("[Alparslan] DNR rule remove failed:", domain, err);
+    logger.warn("DNR rule remove failed:", domain, err);
   }
 }
 
@@ -104,9 +105,9 @@ export async function syncDnrRulesWithBlacklist(domains: string[]): Promise<void
       addRules: newRules,
     });
 
-    console.warn(`[Alparslan] DNR rules synced: ${newRules.length} block rules`);
+    logger.debug(`DNR rules synced: ${newRules.length} block rules`);
   } catch (err) {
-    console.warn("[Alparslan] DNR sync failed:", err);
+    logger.warn("DNR sync failed:", err);
   }
 }
 
@@ -125,9 +126,9 @@ export async function clearAllDnrRules(): Promise<void> {
       });
     }
     activeRules.clear();
-    console.warn("[Alparslan] All DNR block rules cleared");
+    logger.debug("All DNR block rules cleared");
   } catch (err) {
-    console.warn("[Alparslan] DNR clear failed:", err);
+    logger.warn("DNR clear failed:", err);
   }
 }
 

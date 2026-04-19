@@ -40,7 +40,7 @@
     "page": "options.html",
     "open_in_tab": true
   },
-  "web_accessible_resources": ["lists/*"],
+  "content_security_policy": "script-src 'self'; object-src 'self'; base-uri 'none'; form-action 'none'",
   "browser_specific_settings": {
     "gecko": {
       "id": "alparslan@dijitalsavunma.org",

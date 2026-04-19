@@ -30,6 +30,30 @@ export const test = base.extend<{
       serviceWorker = await context.waitForEvent("serviceworker");
     }
     const extensionId = serviceWorker.url().split("/")[2];
+
+    // Wait for the SW to finish its init (USOM + whitelist + breach cache)
+    // AND for onInstalled to finish loading the built-in blocklist + breach
+    // DB into IndexedDB. Without this, the first test races with the
+    // SW's async init: popup opens in "loading" state, content-script
+    // breach checks return empty, and assertions time out.
+    //
+    // Flags are set by src/background/index.ts. 30 s ceiling because USOM
+    // fetch from GitHub is the slowest step and can take 10-15 s on CI.
+    await serviceWorker.evaluate(async () => {
+      interface E2EReadiness {
+        swInitDone: boolean;
+        blocklistLoaded: boolean;
+        breachLoaded: boolean;
+      }
+      const deadline = Date.now() + 30_000;
+      while (Date.now() < deadline) {
+        const s = (globalThis as typeof globalThis & { __alparslanE2E?: E2EReadiness }).__alparslanE2E;
+        if (s?.swInitDone && s?.blocklistLoaded && s?.breachLoaded) return;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      throw new Error("extension service worker did not become ready within 30 s");
+    });
+
     await use(extensionId);
   },
 });
