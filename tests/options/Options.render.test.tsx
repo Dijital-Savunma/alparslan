@@ -13,6 +13,8 @@ describe("Options — Protection Level", () => {
     chrome.storage.sync.get = ((_keys: unknown, cb: (r: Record<string, unknown>) => void) =>
       cb({})) as typeof chrome.storage.sync.get;
     chrome.runtime.sendMessage = vi.fn() as unknown as typeof chrome.runtime.sendMessage;
+    // Footer surum etiketi manifest'ten okunur — test ortaminda mock'la.
+    chrome.runtime.getManifest = (() => ({ version: "0.4.0" })) as unknown as typeof chrome.runtime.getManifest;
   });
 
   it("renders the protection level section with all three levels", () => {

@@ -431,9 +431,9 @@ export default function Options() {
         </p>
       </Section>
 
-      {/* Footer */}
+      {/* Footer — surum manifest.json'dan okunur, hardcoded degil. */}
       <div style={{ marginTop: 32, textAlign: "center", fontSize: 12, color: "#9ca3af" }}>
-        {t.footer}
+        {t.footer(chrome.runtime.getManifest().version)}
       </div>
 
       {/* Disable "Tehlike Uyarıları" confirmation — same dialog as the popup.

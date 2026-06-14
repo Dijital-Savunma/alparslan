@@ -27,7 +27,7 @@ describe("StatusPanel speech bubble", () => {
       <StatusPanel {...baseProps} isWhitelisted={true} reasons={[t.reasons.whitelisted]} />,
     );
     // Bolding splits the sentence across nodes, so assert on the container text.
-    expect(container.textContent).toContain("güvenilir bağlantılarınıza eklemişsiniz");
+    expect(container.textContent).toContain("güvendiğiniz bağlantılara eklediniz");
     expect(container.textContent).toContain("iyi gezintiler");
     // Must NOT claim we scanned it.
     expect(container.textContent).not.toContain("baştan aşağı taradım");
@@ -36,6 +36,6 @@ describe("StatusPanel speech bubble", () => {
   it("shows the generic scanned-safe message for a non-whitelisted safe site", () => {
     const { container } = render(<StatusPanel {...baseProps} isWhitelisted={false} />);
     expect(container.textContent).toContain("baştan aşağı taradım");
-    expect(container.textContent).not.toContain("güvenilir bağlantılarınıza eklemişsiniz");
+    expect(container.textContent).not.toContain("güvendiğiniz bağlantılara eklediniz");
   });
 });

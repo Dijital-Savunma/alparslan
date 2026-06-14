@@ -4,8 +4,10 @@
 const tr = {
   // --- Genel ---
   appName: "Alparslan",
-  version: "v0.1.0",
-  footer: "Alparslan v0.1.0",
+  // Surum etiketi manifest.json'dan okunur (chrome.runtime.getManifest().version);
+  // i18n burada sadece "Alparslan v{x.y.z}" formatini tutar — release'lerde
+  // string'i unutmak yok, manifest tek kaynak.
+  footer: (version: string) => `Alparslan v${version}`,
   close: "Kapat",
   add: "Ekle",
   send: "Gönder",
