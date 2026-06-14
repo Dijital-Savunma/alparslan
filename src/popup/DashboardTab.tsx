@@ -242,11 +242,10 @@ export default function DashboardTab() {
               pointerEvents: "none",
             }}
           >
-            <div style={{ fontSize: 18, marginBottom: -4 }}>🛡️</div>
             <div data-testid="dashboard-score" style={{ fontSize: 30, fontWeight: 800, color: scoreColor, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
               {animatedScore}
             </div>
-            <div style={{ fontSize: 9, color: scoreColor, fontWeight: 600, marginTop: 1, opacity: 0.85 }}>
+            <div style={{ fontSize: 12, color: scoreColor, fontWeight: 600, marginTop: 2, opacity: 0.85 }}>
               /100
             </div>
           </div>

@@ -337,7 +337,7 @@ export default function App() {
         <NotificationPanel
           infoOpen={infoOpen}
           setInfoOpen={setInfoOpen}
-          stats={stats}
+          controlCount={history.length}
           threatCount={history.filter((h) => h.level === "DANGEROUS" || h.level === "SUSPICIOUS").length}
           unknownCount={history.filter((h) => h.level === "UNKNOWN").length}
           protectedDays={protectedDays}

@@ -77,7 +77,11 @@ export interface ScanHistoryEntry {
   checkedAt: number;
 }
 
-export const MAX_HISTORY_ENTRIES = 100;
+// Hard cap on stored history. Set very high so the "Tarama Geçmişi"
+// sayaci normal kullanimda asla tavana takilmaz — yillarca gezinti
+// yetmez. Cap'i tamamen kaldirmiyoruz cunku SW init'inde tum history
+// RAM'e yukleniyor, sinirsiz birikim uzun vadede yavasligi tetikler.
+export const MAX_HISTORY_ENTRIES = 10000;
 export const HISTORY_DISPLAY_LIMIT = 50;
 
 export interface ApiConfig {

@@ -1,4 +1,3 @@
-import { type ExtensionStats } from "@/utils/types";
 import t from "@/i18n/tr";
 
 /**
@@ -8,26 +7,27 @@ import t from "@/i18n/tr";
  * paneli:
  *  - "Alparslan hoş geldiniz" linkiyle açılış
  *  - "X gündür korunuyorsunuz" rozeti
- *  - Bugünkü özet (kontrol / tehdit / potansiyel risk sayıları)
+ *  - Kümülatif özet (kontrol / tehdit / potansiyel risk sayıları)
  *  - "Bu sayfada ne var?" sözlük (renkli kategorilerle terim açıklaması)
  *
  * Stateless: tüm state üst component'tan (infoOpen, stats, vs.) gelir.
  *
- * threatCount ve unknownCount Skor/Durum paneliyle ayni history filtre
- * mantigindan beslenir — boylece "Engellenen Tehdit / Potansiyel Risk"
- * sayilari her yerde tutarli kalir.
+ * controlCount, threatCount ve unknownCount Skor/Durum paneliyle ayni
+ * history kaynagindan beslenir — boylece her yerde sayilar tutarli kalir.
+ * Eskiden "kontrol" sayisi stats.urlsChecked (session counter) idi, Chrome
+ * restart'inda sifirlandigi icin Durum card'iyla uyusmuyordu.
  */
 export function NotificationPanel({
   infoOpen,
   setInfoOpen,
-  stats,
+  controlCount,
   threatCount,
   unknownCount,
   protectedDays,
 }: {
   infoOpen: boolean;
   setInfoOpen: (v: boolean) => void;
-  stats: ExtensionStats;
+  controlCount: number;
   threatCount: number;
   unknownCount: number;
   protectedDays: number;
@@ -62,8 +62,23 @@ export function NotificationPanel({
         {t.notificationCenter.welcome}
         <span
           onClick={() => chrome.tabs.create({ url: "https://dijitalsavunma.org/" })}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.04)";
+            e.currentTarget.style.color = "var(--accent-info-deep)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.color = "var(--accent-info)";
+          }}
           title={t.notificationCenter.welcomeLinkTitle}
-          style={{ color: "var(--accent-info)", fontWeight: 800, cursor: "pointer" }}
+          style={{
+            color: "var(--accent-info)",
+            fontWeight: 800,
+            cursor: "pointer",
+            display: "inline-block",
+            transformOrigin: "left center",
+            transition: "color 0.15s ease, transform 0.15s ease",
+          }}
         >
           {t.notificationCenter.welcomeLink}
         </span>
@@ -92,12 +107,12 @@ export function NotificationPanel({
         </div>
       </div>
 
-      {/* Daily summary — Skor / Durum panelleriyle ayni veriden besleniyor:
-          tehdit = history'deki DANGEROUS|SUSPICIOUS, risk = UNKNOWN. */}
+      {/* Cumulative summary — Skor / Durum panelleriyle ayni veriden besleniyor:
+          control = history.length, tehdit = DANGEROUS|SUSPICIOUS, risk = UNKNOWN. */}
       <div style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text)", marginBottom: 10 }}>
         <div>
           {t.notificationCenter.todayPrefix}
-          <strong style={{ color: "var(--accent-info-deep)" }}>{stats.urlsChecked}</strong>
+          <strong style={{ color: "var(--accent-info-deep)" }}>{controlCount}</strong>
           {t.notificationCenter.todayChecked}
         </div>
         <div>
@@ -116,6 +131,16 @@ export function NotificationPanel({
 
       <button
         onClick={() => setInfoOpen(!infoOpen)}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "#dbeafe";
+          e.currentTarget.style.borderColor = "#93c5fd";
+          e.currentTarget.style.transform = "translateY(-1px)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "#eef2ff";
+          e.currentTarget.style.borderColor = "#bfdbfe";
+          e.currentTarget.style.transform = "translateY(0)";
+        }}
         style={{
           width: "70%",
           margin: "8px auto 10px auto",
@@ -132,6 +157,7 @@ export function NotificationPanel({
           fontWeight: 700,
           cursor: "pointer",
           fontFamily: "inherit",
+          transition: "background 0.15s ease, border-color 0.15s ease, transform 0.15s ease",
         }}
       >
         {infoOpen ? (

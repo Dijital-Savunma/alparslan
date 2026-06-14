@@ -262,7 +262,7 @@ const tr = {
     welcomeLink: "Buraya",
     welcomeLinkTitle: "Dijital Savunma sitesine git",
     welcomeSuffix: " tıklayarak benimle ilgili bilgilere ulaşabilirsiniz.",
-    todayPrefix: "Bugün sizin için ",
+    todayPrefix: "Şu ana kadar sizin için ",
     todayChecked: " kontrol yaptım.",
     todayThreats: " tehdit buldum.",
     todayUnknowns: " potansiyel risk tespit ettim.",
