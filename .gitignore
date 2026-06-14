@@ -9,8 +9,9 @@ Alparslan/
 .env
 .env.local
 # Claude Code: shared team config (CLAUDE.md, .claude/settings.json, .claude/commands/)
-# is tracked; only per-developer local overrides are ignored.
+# is tracked; only per-developer local overrides + ephemeral worktrees are ignored.
 .claude/settings.local.json
+.claude/worktrees/
 .planning/
 playwright-report
 test-results

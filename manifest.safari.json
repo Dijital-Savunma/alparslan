@@ -37,5 +37,11 @@
   "host_permissions": ["<all_urls>"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'none'; form-action 'none'"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/alparslan_logo.svg"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
