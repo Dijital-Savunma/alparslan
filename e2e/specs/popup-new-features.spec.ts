@@ -32,11 +32,11 @@ test.describe("Popup — Notification Centre", () => {
     await popup.close();
   });
 
-  test("daily summary shows in notification panel", async ({ context, extensionId }) => {
+  test("cumulative summary shows in notification panel", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByTitle("Bildirimleri görüntüle").click();
-    // Welcome line + daily summary should both render
-    await expect(popup.getByText(/Bugün sizin için/)).toBeVisible();
+    // Welcome line + cumulative summary should both render
+    await expect(popup.getByText(/Şu ana kadar sizin için/)).toBeVisible();
     await expect(popup.getByText(/gündür korunuyorsunuz/)).toBeVisible();
     await popup.close();
   });
