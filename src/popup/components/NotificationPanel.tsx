@@ -8,21 +8,27 @@ import t from "@/i18n/tr";
  * paneli:
  *  - "Alparslan hoş geldiniz" linkiyle açılış
  *  - "X gündür korunuyorsunuz" rozeti
- *  - Bugünkü özet (kontrol / tehdit / takipçi / şüpheli sayıları)
+ *  - Bugünkü özet (kontrol / tehdit / potansiyel risk sayıları)
  *  - "Bu sayfada ne var?" sözlük (renkli kategorilerle terim açıklaması)
  *
  * Stateless: tüm state üst component'tan (infoOpen, stats, vs.) gelir.
+ *
+ * threatCount ve unknownCount Skor/Durum paneliyle ayni history filtre
+ * mantigindan beslenir — boylece "Engellenen Tehdit / Potansiyel Risk"
+ * sayilari her yerde tutarli kalir.
  */
 export function NotificationPanel({
   infoOpen,
   setInfoOpen,
   stats,
+  threatCount,
   unknownCount,
   protectedDays,
 }: {
   infoOpen: boolean;
   setInfoOpen: (v: boolean) => void;
   stats: ExtensionStats;
+  threatCount: number;
   unknownCount: number;
   protectedDays: number;
 }) {
@@ -30,7 +36,7 @@ export function NotificationPanel({
   return (
     <div
       style={{
-        margin: "10px auto 0 auto",
+        margin: "18px auto",
         width: 300,
         padding: 12,
         background: "var(--surface-elevated)",
@@ -45,7 +51,7 @@ export function NotificationPanel({
         style={{
           fontSize: 12,
           lineHeight: 1.45,
-          color: "var(--text-muted)",
+          color: "var(--text)",
           background: "var(--surface-card)",
           border: "1px solid var(--border)",
           borderRadius: 10,
@@ -86,24 +92,19 @@ export function NotificationPanel({
         </div>
       </div>
 
-      {/* Daily summary */}
-      <div style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text-muted)", marginBottom: 10 }}>
+      {/* Daily summary — Skor / Durum panelleriyle ayni veriden besleniyor:
+          tehdit = history'deki DANGEROUS|SUSPICIOUS, risk = UNKNOWN. */}
+      <div style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text)", marginBottom: 10 }}>
         <div>
           {t.notificationCenter.todayPrefix}
           <strong style={{ color: "var(--accent-info-deep)" }}>{stats.urlsChecked}</strong>
           {t.notificationCenter.todayChecked}
         </div>
         <div>
-          <strong style={{ color: stats.threatsBlocked > 0 ? "var(--accent-danger)" : "var(--accent-success)" }}>
-            {stats.threatsBlocked}
+          <strong style={{ color: threatCount > 0 ? "var(--accent-danger)" : "var(--accent-success)" }}>
+            {threatCount}
           </strong>
           {t.notificationCenter.todayThreats}
-        </div>
-        <div>
-          <strong style={{ color: stats.trackersBlocked > 0 ? "var(--accent-warning)" : "var(--accent-success)" }}>
-            {stats.trackersBlocked}
-          </strong>
-          {t.notificationCenter.todayTrackers}
         </div>
         <div>
           <strong style={{ color: unknownCount > 0 ? "#3640a0" : "var(--accent-success)" }}>
@@ -152,7 +153,7 @@ export function NotificationPanel({
             border: "1px solid var(--border)",
             borderRadius: 12,
             fontSize: 11,
-            color: "var(--text-muted)",
+            color: "var(--text)",
             lineHeight: 1.5,
           }}
         >
@@ -184,10 +185,6 @@ export function NotificationPanel({
           <div style={{ marginBottom: 6 }}>
             <strong style={{ color: "var(--accent-danger)" }}>{g.threatLabel}: </strong>
             {g.threatDesc}
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <strong style={{ color: "var(--accent-warning)" }}>{g.trackerLabel}: </strong>
-            {g.trackerDesc}
           </div>
           <div>
             <strong style={{ color: "#818cf8" }}>{g.unknownLabel}: </strong>

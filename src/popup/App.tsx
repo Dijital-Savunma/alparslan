@@ -338,6 +338,7 @@ export default function App() {
           infoOpen={infoOpen}
           setInfoOpen={setInfoOpen}
           stats={stats}
+          threatCount={history.filter((h) => h.level === "DANGEROUS" || h.level === "SUSPICIOUS").length}
           unknownCount={history.filter((h) => h.level === "UNKNOWN").length}
           protectedDays={protectedDays}
         />
