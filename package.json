@@ -1,7 +1,7 @@
 {
   "name": "alparslan",
   "version": "0.3.0",
-  "description": "Guvenli tarayici eklentisi - Phishing ve dolandiriciliga karsi kalkan",
+  "description": "Oltalama ve dolandırıcılığa karşı güvenli tarayıcı eklentisi",
   "private": true,
   "type": "module",
   "scripts": {
