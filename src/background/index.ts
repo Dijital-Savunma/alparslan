@@ -1,8 +1,8 @@
 // Alparslan - Background Service Worker
 import "@/utils/browser-polyfill";
-import { type Message, type ExtensionSettings, type ExtensionStats, type SiteReport, type ScanHistoryEntry, DEFAULT_SETTINGS, DEFAULT_STATS, MAX_HISTORY_ENTRIES } from "@/utils/types";
+import { type Message, type ExtensionSettings, type ExtensionStats, type SiteReport, type ScanHistoryEntry, DEFAULT_SETTINGS, DEFAULT_STATS, MAX_HISTORY_ENTRIES, ThreatLevel, type ThreatResult } from "@/utils/types";
 import type { PageAnalysisResult } from "@/detector/page-analyzer";
-import { checkUrl, checkUrlConfirmed, extractDomain } from "@/detector/url-checker";
+import { checkUrlConfirmed, extractDomain } from "@/detector/url-checker";
 import { fetchRemoteBlocklist, scheduleListUpdates } from "@/blocklist/updater";
 import { initUsomBlocklist, scheduleUsomUpdates } from "@/blocklist/usom-updater";
 import { initWhitelist, scheduleWhitelistUpdates, getDynamicWhitelistSize } from "@/blocklist/whitelist-updater";
@@ -125,6 +125,31 @@ function updateProgress(stepIndex: number, ms?: number): void {
   initProgress.step = nextPending ? nextPending.name + " " + t.init.loadingSuffix : t.init.ready;
 }
 
+/**
+ * Single source of truth for the verdict that drives a tab's badge AND the
+ * page warning banner. It MUST match the popup/content CHECK_URL path:
+ *   1. honour the user whitelist (the popup shows SAFE for whitelisted sites), and
+ *   2. use checkUrlConfirmed(), which confirms USOM Bloom-filter hits against
+ *      IndexedDB and drops false positives.
+ *
+ * The post-init re-scan, tabs.onUpdated, and CHECK_URL all go through this so a
+ * page banner can never contradict the popup. Regression it fixes: a whitelisted
+ * USOM Bloom-filter false positive (e.g. sahibinden.com) used to get a red
+ * "BU SİTE GÜVENLİ DEĞİL" banner + threat badge from the raw checkUrl() re-scan
+ * while the popup correctly showed güvenli.
+ */
+async function evaluateTab(url: string): Promise<ThreatResult> {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (isWhitelisted(hostname)) {
+      return { level: ThreatLevel.SAFE, score: 0, reasons: [t.reasons.whitelisted], url, checkedAt: Date.now() };
+    }
+  } catch {
+    /* invalid URL — let checkUrlConfirmed produce the verdict */
+  }
+  return checkUrlConfirmed(url, state.settings.protectionLevel);
+}
+
 async function initServiceWorker(): Promise<void> {
   const t0 = Date.now();
 
@@ -218,10 +243,12 @@ async function initServiceWorker(): Promise<void> {
   logger.debug(`Service worker initialized in ${initTimings.total}ms (storage: ${initTimings.storageLoad}ms, cache: ${initTimings.cacheInit}ms)`);
 
   // Re-scan all open tabs now that lists are loaded
-  chrome.tabs.query({}, (tabs) => {
+  chrome.tabs.query({}, async (tabs) => {
     for (const tab of tabs) {
       if (!tab.id || !tab.url || tab.url.startsWith("chrome") || tab.url.startsWith("about:")) continue;
-      const result = checkUrl(tab.url, state.settings.protectionLevel);
+      // evaluateTab() (whitelist + USOM-confirmed) — never the raw checkUrl(),
+      // whose unconfirmed Bloom-filter hit would flash a false danger banner.
+      const result = await evaluateTab(tab.url);
       updateBadge(tab.id, result.level);
 
       // Push warning directly for dangerous tabs (backup to RESCAN pull)
@@ -440,19 +467,10 @@ chrome.runtime.onMessage.addListener(
         // Wait for lists to be loaded before checking — prevents false SAFE on cold start
         if (!initDone) await initReady;
 
-        // Check whitelist via IndexedDB-backed cache
-        try {
-          const hostname = new URL(url).hostname.toLowerCase();
-          if (isWhitelisted(hostname)) {
-            persistStats();
-            addHistoryEntry(url, "SAFE", 0);
-            sendResponse({ level: "SAFE", score: 0, reasons: [t.reasons.whitelisted], url, checkedAt: Date.now(), showDomWarnings: state.settings.showDomWarnings !== false });
-            return;
-          }
-        } catch { /* invalid URL — let checkUrl handle it */ }
-
-        // Use async confirmed check (verifies USOM Bloom filter hits against IDB)
-        const result = await checkUrlConfirmed(url, state.settings.protectionLevel);
+        // Single verdict path (whitelist short-circuit + USOM-confirmed check),
+        // shared with the badge/banner paths via evaluateTab() so the popup and
+        // the page banner can never disagree.
+        const result = await evaluateTab(url);
         if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
           state.stats.threatsBlocked++;
         }
@@ -828,7 +846,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
     (async () => {
       if (!initDone) await initReady;
-      const result = await checkUrlConfirmed(url, state.settings.protectionLevel);
+      const result = await evaluateTab(url);
       updateBadge(tabId, result.level);
 
       if ((result.level === "DANGEROUS" || result.level === "SUSPICIOUS") && state.settings.showDomWarnings !== false) {
