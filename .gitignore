@@ -8,8 +8,9 @@ Alparslan/
 .DS_Store
 .env
 .env.local
-CLAUDE.md
-.claude/
+# Claude Code: shared team config (CLAUDE.md, .claude/settings.json, .claude/commands/)
+# is tracked; only per-developer local overrides are ignored.
+.claude/settings.local.json
 .planning/
 playwright-report
 test-results
