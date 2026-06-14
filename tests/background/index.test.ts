@@ -209,6 +209,41 @@ describe("Background Service Worker", () => {
     });
   });
 
+  // Regression: the page warning banner must agree with the popup verdict.
+  // A whitelisted domain shows SAFE in the popup (CHECK_URL honours the
+  // whitelist), so the onUpdated badge/banner path must honour it too —
+  // otherwise the user sees a red "BU SİTE GÜVENLİ DEĞİL" banner on a site
+  // their own popup calls güvenli. See evaluateTab() in background/index.ts.
+  describe("onUpdated honours the whitelist (no contradictory banner)", () => {
+    it("sends SHOW_WARNING for a flagged, NON-whitelisted domain (sanity)", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250)); // let init complete
+      sendMessageMock.mockClear();
+      onUpdatedCallback(1, { status: "complete" }, { url: "https://isbenk.com.tr/login" });
+      await new Promise((resolve) => setTimeout(resolve, 150)); // async eval
+      const warnings = sendMessageMock.mock.calls.filter(
+        (c) => (c[1] as { type?: string })?.type === "SHOW_WARNING",
+      );
+      expect(warnings.length).toBeGreaterThan(0);
+    });
+
+    it("does NOT send SHOW_WARNING once the domain is whitelisted", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250)); // let init complete
+      onMessageCallback(
+        { type: "ADD_TO_WHITELIST", domain: "isbenk.com.tr" },
+        trustedSender,
+        vi.fn(),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 60)); // write-through
+      sendMessageMock.mockClear();
+      onUpdatedCallback(1, { status: "complete" }, { url: "https://isbenk.com.tr/login" });
+      await new Promise((resolve) => setTimeout(resolve, 150)); // async eval
+      const warnings = sendMessageMock.mock.calls.filter(
+        (c) => (c[1] as { type?: string })?.type === "SHOW_WARNING",
+      );
+      expect(warnings).toHaveLength(0);
+    });
+  });
+
   describe("GET_SETTINGS message", () => {
     it("should return current settings", () => {
       const sendResponse = vi.fn();
@@ -268,13 +303,16 @@ describe("Background Service Worker", () => {
       // Give async write-through a tick to complete
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Then check URL
+      // Then check URL. CHECK_URL now resolves the verdict through the shared
+      // async evaluateTab() helper, so the response lands on a microtask — await
+      // a tick before asserting (matches the other async CHECK_URL test).
       const sendResponse = vi.fn();
       onMessageCallback(
         { type: "CHECK_URL", url: "https://example.com/phishing" },
         {},
         sendResponse,
       );
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(sendResponse).toHaveBeenCalledWith(
         expect.objectContaining({ level: "SAFE", reasons: ["Güvenilir bağlantı listemde"] }),

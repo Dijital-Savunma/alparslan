@@ -218,6 +218,11 @@ const tr = {
     suspicious: (domain: string) => `${domain} sayfasında şüpheli hareketler seziyorum. Bilgilerinizi veya şifrelerinizi girerken dikkatli olun!`,
     dangerous: (domain: string) => `Durun! ${domain} sayfasında dijital tuzaklar ve zararlı yazılımlar var. Güvenliğiniz için bu sayfadan hemen uzaklaşın!`,
     unknown: (domain: string) => `${domain} sayfasını ilk defa görüyorum. Kalkanlarım şu an arka planda sayfayı incelemeye devam ediyor, merak etmeyin.`,
+    // Shown when the SAFE verdict comes from the user's own whitelist — we
+    // didn't scan it, they vouched for it, so we acknowledge that instead of
+    // claiming we scanned it. Keep the "iyi gezintiler" keyword: StatusPanel
+    // bolds it as the highlight word.
+    whitelisted: (domain: string) => `${domain} sayfasını güvenilir bağlantılarınıza eklemişsiniz. Burada gönlünüz rahat olsun — iyi gezintiler!`,
     // Aksiyon paneli — risk taşıyan durumlarda balonun altında çıkar.
     actionPrompt: "Dilerseniz güvenliğiniz için aşağıdaki adımlardan birini seçebilirsiniz:",
     actionClose: "Sayfadan Ayrıl",
