@@ -89,10 +89,11 @@ export function StatusPanel({
           // Domain shown inside the sentence ("chatgpt.com sayfasını sizin
           // için..."); falls back to a generic noun when we don't have one.
           const siteName = displayDomain && displayDomain !== "—" ? displayDomain : "Bu sayfa";
-          // A SAFE verdict carrying the whitelist reason means the user trusts
-          // this site themselves — greet them accordingly instead of claiming we
-          // scanned it. (Keeps the popup honest with the no-banner whitelist path.)
-          const whitelisted = displayStatus === "safe" && reasons.includes(t.reasons.whitelisted);
+          // A SAFE verdict on a site the user themselves trusts — greet them
+          // accordingly instead of claiming we scanned it. Keys off the
+          // authoritative isWhitelisted prop from App so it stays in sync with
+          // the no-banner whitelist path.
+          const whitelisted = displayStatus === "safe" && isWhitelisted;
           const message =
             whitelisted ? t.speechBubble.whitelisted(siteName) :
             displayStatus === "safe" ? t.speechBubble.safe(siteName) :
