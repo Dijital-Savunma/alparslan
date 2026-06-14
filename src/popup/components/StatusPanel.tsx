@@ -89,7 +89,12 @@ export function StatusPanel({
           // Domain shown inside the sentence ("chatgpt.com sayfasını sizin
           // için..."); falls back to a generic noun when we don't have one.
           const siteName = displayDomain && displayDomain !== "—" ? displayDomain : "Bu sayfa";
+          // A SAFE verdict carrying the whitelist reason means the user trusts
+          // this site themselves — greet them accordingly instead of claiming we
+          // scanned it. (Keeps the popup honest with the no-banner whitelist path.)
+          const whitelisted = displayStatus === "safe" && reasons.includes(t.reasons.whitelisted);
           const message =
+            whitelisted ? t.speechBubble.whitelisted(siteName) :
             displayStatus === "safe" ? t.speechBubble.safe(siteName) :
             displayStatus === "dangerous" ? t.speechBubble.dangerous(siteName) :
             displayStatus === "suspicious" ? t.speechBubble.suspicious(siteName) :
@@ -105,6 +110,7 @@ export function StatusPanel({
           // Word that gets bolded + status-coloured so the eye lands on the
           // verdict in one glance without making the whole bubble loud.
           const highlightWord =
+            whitelisted ? "iyi gezintiler" :
             displayStatus === "safe" ? "güvendesiniz" :
             displayStatus === "dangerous" ? "uzaklaşın" :
             displayStatus === "suspicious" ? "dikkatli olun" :
