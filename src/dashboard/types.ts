@@ -13,6 +13,8 @@ export interface WeeklyMetrics {
   dangerousSitesVisited: number;
   /** Number of SUSPICIOUS-level sites visited */
   suspiciousSitesVisited: number;
+  /** Number of UNKNOWN-level sites visited (cannot confidently classify) */
+  unknownSitesVisited: number;
   /** Week start timestamp (Monday 00:00) */
   weekStart: number;
 }
@@ -39,6 +41,18 @@ export interface DashboardData {
   previousWeek: WeeklyMetrics | null;
   /** Human-readable tips based on weakest areas */
   tips: string[];
+  /**
+   * Sayilar arasinda uyusmamazlik yasanmasin diye background, skoru tam
+   * olarak su sayilara dayanarak hesapladi. Popup Skor Analizi panosu da
+   * AYNI sayilari kullanir; boylece kullanici "skor 84 ama panel sadece
+   * -10 gosteriyor" gibi celiskilerle karsilasmaz.
+   */
+  insightCounts?: {
+    uniqueSafe: number;
+    uniqueThreat: number;
+    uniqueUnknown: number;
+    scanOn: boolean;
+  };
 }
 
 export const EMPTY_WEEKLY_METRICS: WeeklyMetrics = {
@@ -49,5 +63,6 @@ export const EMPTY_WEEKLY_METRICS: WeeklyMetrics = {
   httpCount: 0,
   dangerousSitesVisited: 0,
   suspiciousSitesVisited: 0,
+  unknownSitesVisited: 0,
   weekStart: 0,
 };

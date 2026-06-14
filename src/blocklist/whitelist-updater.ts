@@ -13,6 +13,7 @@ import {
 } from "@/storage/idb";
 import { logger } from "@/utils/logger";
 import { fetchTextWithLimit, FETCH_LIMITS } from "@/utils/safe-fetch";
+import { canonicalizeUrl, isPublicSuffixHostname } from "@/detector/url-canonicalizer";
 
 const GITHUB_BASE = "https://raw.githubusercontent.com/AsabiAlgo/blocklists/main";
 const WHITELIST_URL = `${GITHUB_BASE}/whitelist.txt`;
@@ -55,47 +56,24 @@ export function getDynamicWhitelistSize(): number {
   return whitelistDomains.size;
 }
 
-// Domains that must NEVER appear in the dynamic whitelist. A single
-// entry like "com.tr" or "co.uk" would, combined with list-cache's
-// parent-match behaviour, make every subdomain of that public suffix
-// a whitelisted bypass. We reject them at parse time rather than rely
-// on upstream discipline — the remote list is a supply-chain surface.
-const PUBLIC_SUFFIXES: ReadonlySet<string> = new Set([
-  // Single-label gTLDs / ccTLDs
-  "com", "org", "net", "edu", "gov", "mil", "int", "info", "biz",
-  "tr", "uk", "de", "fr", "jp", "kr", "cn", "ru", "it", "es", "pl",
-  "nl", "be", "at", "ch", "se", "no", "fi", "dk", "br", "au", "ca",
-  "us", "io", "co", "me", "tv", "xyz", "app", "dev",
-  // Compound Turkish public suffixes (most relevant for this project)
-  "com.tr", "net.tr", "org.tr", "edu.tr", "gov.tr", "mil.tr", "bel.tr",
-  "pol.tr", "k12.tr", "tsk.tr", "av.tr", "dr.tr",
-  // Other common compound public suffixes
-  "co.uk", "ac.uk", "gov.uk", "org.uk", "me.uk",
-  "com.au", "net.au", "org.au", "edu.au", "gov.au",
-  "co.jp", "ne.jp", "or.jp", "ac.jp",
-  "co.kr", "or.kr",
-  "co.in", "net.in",
-  "co.za",
-  "com.br", "net.br", "org.br", "gov.br",
-]);
-
-function isPublicSuffix(domain: string): boolean {
-  return PUBLIC_SUFFIXES.has(domain);
+function normalizeDomainEntry(domain: string): string | null {
+  const canonical = canonicalizeUrl(`https://${domain}`);
+  if (!canonical.hostname || !canonical.hostname.includes(".")) return null;
+  if (isPublicSuffixHostname(canonical.hostname)) {
+    logger.warn("Rejected public-suffix whitelist entry:", canonical.hostname);
+    return null;
+  }
+  return canonical.hostname;
 }
 
 function parseDomainList(text: string): string[] {
   return text
     .split("\n")
     .map((line) => line.trim().toLowerCase())
-    .filter((line) => {
-      if (!line || line.startsWith("#")) return false;
-      // At least one dot — single-label "com" is always a public suffix.
-      if (!line.includes(".")) return false;
-      if (isPublicSuffix(line)) {
-        logger.warn("Rejected public-suffix whitelist entry:", line);
-        return false;
-      }
-      return true;
+    .flatMap((line) => {
+      if (!line || line.startsWith("#")) return [];
+      const normalized = normalizeDomainEntry(line);
+      return normalized ? [normalized] : [];
     });
 }
 

@@ -24,6 +24,7 @@ describe("normalizeQuickWhitelistDomain", () => {
       ["https://example.com", "example.com"],
       ["https://www.example.com", "example.com"],
       ["https://www.example.com/", "example.com"],
+      ["https://www.example.com:8443/login?token=abc", "example.com"],
     ])("%s → %s", (input, expected) => {
       expect(normalizeQuickWhitelistDomain(input)).toBe(expected);
     });
@@ -78,6 +79,10 @@ describe("normalizeQuickWhitelistDomain", () => {
       expect(normalizeQuickWhitelistDomain("www.akbank.com.tr")).toBe("akbank.com.tr");
     });
 
+    it("preserves private-suffix registrable domains after URL parsing", () => {
+      expect(normalizeQuickWhitelistDomain("https://foo.github.io/path")).toBe("foo.github.io");
+    });
+
     it("only strips the FIRST www, leaves www in middle of host", () => {
       // Pathological but defensive: an attacker can't sneak a bare host past
       // us by embedding "www." mid-string.
@@ -110,6 +115,11 @@ describe("isDomainInWhitelist", () => {
 
     it("matches multi-segment TLD subdomain", () => {
       expect(isDomainInWhitelist("mobile.akbank.com.tr", ["akbank.com.tr"])).toBe(true);
+    });
+
+    it("matches only within the same private-suffix registrable domain", () => {
+      expect(isDomainInWhitelist("bar.foo.github.io", ["foo.github.io"])).toBe(true);
+      expect(isDomainInWhitelist("evil.github.io", ["foo.github.io"])).toBe(false);
     });
   });
 

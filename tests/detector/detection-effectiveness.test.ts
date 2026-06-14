@@ -90,6 +90,12 @@ const PHISH_CORPUS: PhishCase[] = [
   // Suspicious keyword in domain
   { url: "https://secure-garanti-login.xyz", tag: "keyword+typo", expected: "AT_LEAST_SUSPICIOUS" },
   { url: "https://verify-akbank.top", tag: "keyword:verify", expected: "AT_LEAST_SUSPICIOUS" },
+
+  // Turkish keyword + separator phishing patterns (Issue #39 — contextual scoring)
+  { url: "https://turkiye-giris.com/", tag: "tr-kw:turkiye-giris", expected: "AT_LEAST_SUSPICIOUS" },
+  { url: "https://garanti-online-giris.com/", tag: "tr-kw:garanti-giris", expected: "AT_LEAST_SUSPICIOUS" },
+  { url: "https://login-akbank-hesabim.com/", tag: "tr-kw:akbank-login", expected: "AT_LEAST_SUSPICIOUS" },
+  { url: "https://akbank-odeme-dogrula.xyz/", tag: "tr-kw:akbank-odeme", expected: "AT_LEAST_SUSPICIOUS" },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -160,6 +166,22 @@ const LEGIT_CORPUS: string[] = [
   "https://www.vestel.com.tr/",
   "https://www.ebebek.com/",
   "https://www.morhipo.com/",
+  // Additional legitimate sites
+  "https://sahibinden.com/",
+  "https://turkiye.gov.tr/",
+  "https://www.canva.com/",
+  "https://www.linkedin.com/",
+  // Issue #39 must NOT be flagged after contextual scoring fix
+  "https://turkiyeacikkaynakplatformu.com/",
+  "https://garantibelgesi.com/",
+  "https://garantiliurunler.com/",
+  "https://turkiyeyazilimvakfi.org/",
+  "https://sokak.org/",
+  "https://isbasiplatformu.com/",
+  "https://garantifonlari.gov.tr/",
+  "https://goturkiye.com/",
+  "https://garantiliindirim.com/",
+  "https://akbankindirim.com/",
 ];
 
 describe("Phase 3 — Detection effectiveness", () => {
@@ -181,8 +203,8 @@ describe("Phase 3 — Detection effectiveness", () => {
           tc.expected === "DANGEROUS"
             ? result.level === ThreatLevel.DANGEROUS
             : tc.expected === "SUSPICIOUS"
-            ? result.level === ThreatLevel.SUSPICIOUS
-            : flagged;
+              ? result.level === ThreatLevel.SUSPICIOUS
+              : flagged;
 
         if (passed) {
           metrics.tp++;
@@ -195,8 +217,16 @@ describe("Phase 3 — Detection effectiveness", () => {
             reasons: result.reasons,
           });
         }
-        expect({ tag: tc.tag, level: result.level, score: result.score, reasons: result.reasons })
-          .toMatchObject({ tag: tc.tag }); // soft — full verdict captured below
+        if (tc.expected === "DANGEROUS") {
+          expect(result.level, `[${tc.tag}] ${tc.url}`).toBe(ThreatLevel.DANGEROUS);
+        } else if (tc.expected === "SUSPICIOUS") {
+          expect(result.level, `[${tc.tag}] ${tc.url}`).toBe(ThreatLevel.SUSPICIOUS);
+        } else {
+          expect(
+            [ThreatLevel.DANGEROUS, ThreatLevel.SUSPICIOUS],
+            `[${tc.tag}] ${tc.url}`,
+          ).toContain(result.level);
+        }
       });
     }
   });
@@ -215,7 +245,10 @@ describe("Phase 3 — Detection effectiveness", () => {
         } else {
           metrics.tn++;
         }
-        expect({ url, level: result.level }).toMatchObject({ url });
+        expect(
+          [ThreatLevel.SAFE, ThreatLevel.UNKNOWN],
+          `FALSE POSITIVE: ${url}`,
+        ).toContain(result.level);
       });
     }
   });

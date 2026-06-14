@@ -1,14 +1,4 @@
-// Public suffixes that, if allowed as whitelist entries, would disable
-// protection for entire TLDs via the list-cache parent-match rule.
-// Kept intentionally short — the list-cache parent-match is already
-// restricted; this is a UX guard that tells the user "don't do that".
-const REJECTED_SUFFIXES: ReadonlySet<string> = new Set([
-  "com", "org", "net", "edu", "gov", "mil", "int", "info", "biz",
-  "tr", "uk", "de", "fr", "jp", "kr", "cn", "ru", "it", "es",
-  "nl", "be", "io", "co", "me", "xyz", "app", "dev",
-  "com.tr", "net.tr", "org.tr", "edu.tr", "gov.tr", "mil.tr",
-  "co.uk", "ac.uk", "gov.uk",
-]);
+import { canonicalizeUrl, isPublicSuffixHostname } from "@/detector/url-canonicalizer";
 
 /**
  * Normalise a user-typed whitelist entry:
@@ -22,24 +12,21 @@ const REJECTED_SUFFIXES: ReadonlySet<string> = new Set([
 export function normalizeWhitelistInput(raw: string): string {
   const trimmed = raw.trim().toLowerCase();
   if (!trimmed) return "";
+
   let host = trimmed;
-  // If user pasted a full URL, parse it.
   if (host.includes("://")) {
-    try {
-      host = new URL(host).hostname;
-    } catch {
-      return "";
-    }
+    const canonical = canonicalizeUrl(host);
+    host = canonical.hostname ?? "";
   } else {
-    // Strip any path / query / fragment if they typed "example.com/foo".
     host = host.split("/")[0].split("?")[0].split("#")[0];
   }
-  // Strip port.
+
   host = host.split(":")[0];
-  // Strip leading dots and "*." wildcard prefixes. www is preserved
-  // intentionally — some sites only serve on the www subdomain.
   host = host.replace(/^(\*\.|\.)+/, "");
-  if (!host.includes(".")) return ""; // bare TLD / single label
-  if (REJECTED_SUFFIXES.has(host)) return ""; // public suffix
-  return host;
+
+  const canonical = canonicalizeUrl(`https://${host}`);
+  if (!canonical.hostname || !canonical.hostname.includes(".")) return "";
+  if (isPublicSuffixHostname(canonical.hostname)) return "";
+
+  return canonical.hostname;
 }

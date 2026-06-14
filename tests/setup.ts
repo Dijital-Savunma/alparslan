@@ -1,5 +1,6 @@
 // Vitest setup - mock Chrome APIs
 import "fake-indexeddb/auto";
+import { vi } from "vitest";
 
 const chromeMock = {
   runtime: {
@@ -49,5 +50,27 @@ const chromeMock = {
 
 Object.defineProperty(globalThis, "chrome", {
   value: chromeMock,
+  writable: true,
+});
+
+const originalFetch = globalThis.fetch?.bind(globalThis);
+
+Object.defineProperty(globalThis, "fetch", {
+  value: vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+    if (url === "chrome-extension://mock-id/lists/tr-phishing.json") {
+      return Promise.resolve(
+        new Response(JSON.stringify({ domains: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    }
+
+    return originalFetch
+      ? originalFetch(input, init)
+      : Promise.reject(new Error(`Unhandled fetch in test setup: ${url}`));
+  }),
   writable: true,
 });

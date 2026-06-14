@@ -33,8 +33,11 @@ function createWarningBanner(level: string, reason: string): void {
 
   const isDangerous = level === "DANGEROUS";
   const bgColor = isDangerous ? "#dc2626" : "#d97706";
-  const icon = isDangerous ? "\u26A0\uFE0F" : "\u26A0";
   const title = isDangerous ? t.banner.dangerous : t.banner.suspicious;
+  // Friendly assistant body \u2014 replaces the raw technical reason ("USOM tehdit
+  // listesinde" vb.) with a sentence telling the user what to actually do.
+  const body = isDangerous ? t.banner.dangerousBody : t.banner.suspiciousBody;
+  const logoUrl = chrome.runtime.getURL("icons/alparslan_logo.svg");
 
   shadow.innerHTML = `
     <style>
@@ -42,38 +45,51 @@ function createWarningBanner(level: string, reason: string): void {
         font-family: system-ui, -apple-system, sans-serif;
         background: ${bgColor};
         color: white;
-        padding: 12px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        padding: 12px 110px;
+        text-align: center;
+        position: relative;
         font-size: 14px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         animation: slideDown 0.3s ease-out;
       }
-      .banner-content { display: contents; align-items: center; gap: 12px; flex: 1; }
-      .banner-icon { font-size: 20px; }
-      .banner-title { font-weight: 700; }
-      .banner-reason { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+      .banner-titlerow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      .banner-logo {
+        width: 34px;
+        height: 34px;
+        flex-shrink: 0;
+        /* Logoyu dogrudan bannerin uzerinde goster — beyaz daire yok, miger
+           ikonun kendi formu okunsun. */
+      }
+      .banner-title { font-weight: 700; font-size: 15px; letter-spacing: 0.2px; }
+      .banner-reason { font-size: 12.5px; opacity: 0.95; margin-top: 4px; line-height: 1.4; max-width: 720px; margin-left: auto; margin-right: auto; }
       .banner-close {
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
         background: rgba(255,255,255,0.2);
         border: none; color: white;
-        padding: 6px 12px; border-radius: 4px;
+        padding: 6px 14px; border-radius: 6px;
         cursor: pointer; font-size: 13px; font-family: inherit;
+        transition: background 0.15s ease;
       }
-      .banner-close:hover { background: rgba(255,255,255,0.3); }
+      .banner-close:hover { background: rgba(255,255,255,0.32); }
       @keyframes slideDown {
         from { transform: translateY(-100%); }
         to { transform: translateY(0); }
       }
     </style>
     <div class="banner" role="alert">
-      <div class="banner-content">
-        <span class="banner-icon">${icon}</span>
-        <div>
-          <div class="banner-title">${t.banner.prefix} ${title}</div>
-          <div class="banner-reason">${escapeHtml(reason)}</div>
-        </div>
+      <div class="banner-titlerow">
+        <img src="${logoUrl}" class="banner-logo" alt="Alparslan" />
+        <span class="banner-title">${title}</span>
       </div>
+      <div class="banner-reason">${escapeHtml(body)}</div>
       <button class="banner-close" id="close-btn">${t.close}</button>
     </div>
   `;
@@ -103,7 +119,29 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
-function createBreachInfoBanner(reason: string): void {
+// Storage key used to remember which domains the user explicitly silenced the
+// breach banner for. The list is in chrome.storage.local so it survives
+// reloads and applies cross-tab.
+const BREACH_DISMISSED_KEY = "alparslan-breach-dismissed-domains";
+
+function isBreachDismissedForDomain(domain: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([BREACH_DISMISSED_KEY], (result) => {
+      const list = (result[BREACH_DISMISSED_KEY] as string[] | undefined) || [];
+      resolve(list.includes(domain));
+    });
+  });
+}
+
+// @mertinkos review yorumu: content script'in chrome.storage.local'a
+// direkt yazmasi mimari acidan tehlikeli (injection riski). Yazma
+// background'a tasindi; content script artik DISMISS_BREACH_DOMAIN
+// mesajini gonderir, background validate edip yazar.
+function rememberBreachDismissal(domain: string): void {
+  chrome.runtime.sendMessage({ type: "DISMISS_BREACH_DOMAIN", domain });
+}
+
+function createBreachInfoBanner(reason: string, domain: string): void {
   const existing = document.getElementById(BREACH_BANNER_HOST_ID);
   if (existing) existing.remove();
 
@@ -115,12 +153,28 @@ function createBreachInfoBanner(reason: string): void {
 
   const style = document.createElement("style");
   style.textContent = [
-    ".breach-banner { font-family: system-ui, -apple-system, sans-serif; background: #1e40af; color: white; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; box-shadow: 0 -2px 8px rgba(0,0,0,0.2); animation: slideUp 0.3s ease-out; }",
-    ".breach-content { display: flex; align-items: center; gap: 10px; flex: 1; }",
-    ".breach-icon { font-size: 18px; }",
-    ".breach-close { background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }",
-    ".breach-close:hover { background: rgba(255,255,255,0.3); }",
+    ".breach-banner { font-family: system-ui, -apple-system, sans-serif; background: #1e40af; color: white; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; box-shadow: 0 -2px 8px rgba(0,0,0,0.2); animation: slideUp 0.3s ease-out; }",
+    ".breach-content { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }",
+    ".breach-icon { font-size: 18px; flex-shrink: 0; }",
+    ".breach-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }",
+    ".breach-btn { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.18); color: white; padding: 5px 11px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; white-space: nowrap; transition: background 0.15s ease, border-color 0.15s ease; }",
+    ".breach-btn:hover { background: rgba(255,255,255,0.32); border-color: rgba(255,255,255,0.40); }",
+    ".breach-btn.secondary { background: transparent; border-color: rgba(255,255,255,0.35); }",
+    ".breach-btn.secondary:hover { background: rgba(255,255,255,0.14); }",
     "@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }",
+    /* Confirmation modal */
+    ".confirm-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; font-family: system-ui, -apple-system, sans-serif; }",
+    ".confirm-backdrop.open { opacity: 1; pointer-events: auto; }",
+    ".confirm-card { background: #ffffff; border-radius: 14px; padding: 22px; max-width: 380px; width: 100%; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.30); transform: scale(0.94); transition: transform 0.2s ease; box-sizing: border-box; }",
+    ".confirm-backdrop.open .confirm-card { transform: scale(1); }",
+    ".confirm-title { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 10px; }",
+    ".confirm-body { font-size: 13px; line-height: 1.55; color: #64748b; margin: 0 0 20px; }",
+    ".confirm-actions { display: flex; gap: 8px; }",
+    ".confirm-btn { flex: 1; padding: 10px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }",
+    ".confirm-btn.primary { background: #2563eb; color: #ffffff; border: none; box-shadow: 0 3px 8px rgba(37, 99, 235, 0.30); }",
+    ".confirm-btn.primary:hover { background: #1d4ed8; transform: scale(1.03); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.40); }",
+    ".confirm-btn.muted { background: transparent; color: #64748b; border: 1px solid #cbd5e1; }",
+    ".confirm-btn.muted:hover { background: #f1f5f9; color: #1e293b; border-color: #94a3b8; transform: scale(1.03); }",
   ].join(" ");
   shadow.appendChild(style);
 
@@ -142,13 +196,80 @@ function createBreachInfoBanner(reason: string): void {
 
   banner.appendChild(content);
 
+  // Action group \u2014 primary "Kapat" closes for this session, secondary
+  // "Kapat ve bir daha g\u00F6sterme" persists the dismissal in storage so this
+  // domain never shows the banner again across visits / tabs / restarts.
+  const actions = document.createElement("div");
+  actions.className = "breach-actions";
+
   const closeBtn = document.createElement("button");
-  closeBtn.className = "breach-close";
-  closeBtn.textContent = t.close;
+  closeBtn.className = "breach-btn";
+  closeBtn.textContent = t.breach.closeOnce;
   closeBtn.addEventListener("click", () => host.remove());
-  banner.appendChild(closeBtn);
+  actions.appendChild(closeBtn);
+
+  const muteBtn = document.createElement("button");
+  muteBtn.className = "breach-btn secondary";
+  muteBtn.textContent = t.breach.dontShowAgain;
+  actions.appendChild(muteBtn);
+
+  banner.appendChild(actions);
 
   shadow.appendChild(banner);
+
+  // Confirmation modal — Vazgeç is the dominant filled-blue button (so a
+  // reflexive tap keeps the safety net), Evet is the muted outlined button
+  // (user has to deliberately reach for it). Lives inside the same shadow
+  // root as the banner so style isolation is shared.
+  const backdrop = document.createElement("div");
+  backdrop.className = "confirm-backdrop";
+
+  const card = document.createElement("div");
+  card.className = "confirm-card";
+
+  const cardTitle = document.createElement("div");
+  cardTitle.className = "confirm-title";
+  cardTitle.textContent = t.breach.dismissConfirmTitle;
+  card.appendChild(cardTitle);
+
+  const cardBody = document.createElement("div");
+  cardBody.className = "confirm-body";
+  cardBody.textContent = t.breach.dismissConfirmBody(domain);
+  card.appendChild(cardBody);
+
+  const cardActions = document.createElement("div");
+  cardActions.className = "confirm-actions";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "confirm-btn primary";
+  cancelBtn.textContent = t.breach.dismissConfirmCancel;
+  cancelBtn.addEventListener("click", () => {
+    backdrop.classList.remove("open");
+  });
+  cardActions.appendChild(cancelBtn);
+
+  const yesBtn = document.createElement("button");
+  yesBtn.className = "confirm-btn muted";
+  yesBtn.textContent = t.breach.dismissConfirmYes;
+  yesBtn.addEventListener("click", () => {
+    rememberBreachDismissal(domain);
+    backdrop.classList.remove("open");
+    host.remove();
+  });
+  cardActions.appendChild(yesBtn);
+
+  card.appendChild(cardActions);
+  backdrop.appendChild(card);
+  shadow.appendChild(backdrop);
+
+  // Tapping outside the card dismisses the modal (cancel-equivalent).
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) backdrop.classList.remove("open");
+  });
+
+  muteBtn.addEventListener("click", () => {
+    backdrop.classList.add("open");
+  });
 
   if (document.body) {
     document.body.appendChild(host);
@@ -194,12 +315,14 @@ function runPageAnalysis(): void {
     // Check for breach history
     chrome.runtime.sendMessage(
       { type: "CHECK_BREACH", domain },
-      (response: { isBreached: boolean; breaches: { name: string; date: string; dataTypes: string[] }[] } | null) => {
-        if (response?.isBreached && response.breaches.length > 0) {
-          const breach = response.breaches[0];
-          const reason = t.breach.detected(breach.name, breach.date, breach.dataTypes.join(", "));
-          createBreachInfoBanner(reason);
-        }
+      async (response: { isBreached: boolean; breaches: { name: string; date: string; dataTypes: string[] }[] } | null) => {
+        if (!response?.isBreached || response.breaches.length === 0) return;
+        // Skip the banner entirely if the user previously chose "bir daha
+        // gösterme" for this domain.
+        if (await isBreachDismissedForDomain(domain)) return;
+        const breach = response.breaches[0];
+        const reason = t.breach.detected(breach.name, breach.date, breach.dataTypes.join(", "));
+        createBreachInfoBanner(reason, domain);
       },
     );
   } catch {

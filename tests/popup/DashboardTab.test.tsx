@@ -5,12 +5,25 @@ import DashboardTab from "@/popup/DashboardTab";
 import t from "@/i18n/tr";
 
 describe("DashboardTab", () => {
+  // Skor backend'in dashboard.score'undan DEGIL, insightCounts'tan hesaplanir.
+  // Reward sistemi sonrasi formul:
+  //   100 − tehdit×10 − risk×5 − (ayar kapali?10:0) + safe×1
+  //   + (tehdit yoksa +10) + (risk yoksa +5)
+  // Mock: 0 tehdit + 1 risk + 0 safe + scan acik
+  //   = 100 − 0 − 5 − 0 + 0 + 10 (tehdit yok ödülü) + 0 (risk var)
+  //   = 105, tavan 100
   const mockDashboard = {
-    score: 72,
-    breakdown: { httpsScore: 25, threatAvoidanceScore: 27, activityScore: 10, trackerScore: 10 },
-    currentWeek: { urlsChecked: 50, httpsCount: 45, httpCount: 5, threatsBlocked: 2, trackersBlocked: 30, dangerousSitesVisited: 0, suspiciousSitesVisited: 1, weekStart: Date.now() },
+    score: 100,
+    breakdown: { httpsScore: 0, threatAvoidanceScore: 100, activityScore: 0, trackerScore: 0 },
+    currentWeek: { urlsChecked: 50, httpsCount: 45, httpCount: 5, threatsBlocked: 0, trackersBlocked: 0, dangerousSitesVisited: 0, suspiciousSitesVisited: 0, unknownSitesVisited: 1, weekStart: Date.now() },
     previousWeek: null,
-    tips: [t.tips.insecureHttp],
+    tips: [t.tips.notActive],
+    insightCounts: {
+      uniqueSafe: 0,
+      uniqueThreat: 0,
+      uniqueUnknown: 1,
+      scanOn: true,
+    },
   };
 
   beforeEach(() => {
@@ -19,31 +32,45 @@ describe("DashboardTab", () => {
       const callback = cb as ((response: unknown) => void) | undefined;
       if (message.type === "GET_DASHBOARD_SCORE" && callback) {
         callback({ dashboard: mockDashboard });
+      } else if (message.type === "GET_STATS" && callback) {
+        callback({ stats: { urlsChecked: 0, threatsBlocked: 0, trackersBlocked: 0 } });
+      } else if (message.type === "GET_HISTORY" && callback) {
+        callback({ history: [] });
+      } else if (message.type === "GET_SETTINGS" && callback) {
+        callback({ settings: { networkMonitoringEnabled: true } });
       }
     }) as unknown as typeof chrome.runtime.sendMessage;
+    // chrome.storage.onChanged listener kullaniliyor; minimal stub.
+    (globalThis as unknown as { chrome: typeof chrome }).chrome.storage = {
+      onChanged: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+    } as unknown as typeof chrome.storage;
   });
 
-  it("renders score value", async () => {
+  it("renders the computed score value", async () => {
+    render(<DashboardTab />);
+    // Reward sistemi: 0 tehdit (+10 ödül) − 1 risk (5 ceza) = +5 → 105 → cap 100.
+    // useCountUp animates 0→100 over 300ms; nihai deger 100.
+    await waitFor(() => {
+      expect(screen.getByText("100")).toBeDefined();
+    }, { timeout: 1000 });
+  });
+
+  it("renders the score breakdown panel title", async () => {
     render(<DashboardTab />);
     await waitFor(() => {
-      expect(screen.getByText("72")).toBeDefined();
+      expect(screen.getByText(t.skorBreakdown.title)).toBeDefined();
     });
   });
 
-  it("renders score breakdown categories", async () => {
+  it("renders the status message under the ring", async () => {
+    // Score 100 (>= 80) → "safe" tier message.
     render(<DashboardTab />);
     await waitFor(() => {
-      expect(screen.getAllByText("HTTPS").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText(t.dashboard.threat)).toBeDefined();
-      expect(screen.getByText("Aktivite")).toBeDefined();
-      expect(screen.getAllByText("Tracker").length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  it("renders tips when present", async () => {
-    render(<DashboardTab />);
-    await waitFor(() => {
-      expect(screen.getByText(/HTTPS olan alternatifleri/)).toBeDefined();
+      expect(screen.getByText(t.scoreRing.safeTitle)).toBeDefined();
+      expect(screen.getByText(t.scoreRing.safeSubtitle)).toBeDefined();
     });
   });
 

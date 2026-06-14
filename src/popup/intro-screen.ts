@@ -77,6 +77,10 @@ export function initIntroScreen(): void {
         protectionActive: true,
         protectionEnabled: true,
         protectionStartedAt: settings.protectionStartedAt || Date.now(),
+        // Alparslan ilk kez aktive edildigi an asistan modu (konusma balonu)
+        // her zaman acik gelmeli. Kullanici daha onceden kapatmissa
+        // (false), o tercihine saygi gosteririz; aksi takdirde true.
+        speechBubbleEnabled: settings.speechBubbleEnabled !== false,
       };
       chrome.storage.sync.set({ enabled: true, settings: updatedSettings }, () => {
         chrome.runtime.sendMessage({ type: "SET_ENABLED", enabled: true });

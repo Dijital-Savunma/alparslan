@@ -437,11 +437,11 @@
             <div class="intro-switch-circle" id="introSwitchCircle"></div>
           </div>
 
-          <div id="introSwitchStatus" class="intro-switch-status">
-            Kalkan Devrede
-          </div>
+          <div class="intro-button-hint">Koruma sistemini başlat</div>
         </button>
-        <div class="intro-button-hint">Koruma sistemini başlat</div>
+        <div id="introSwitchStatus" class="intro-switch-status">
+          Kalkan Devrede
+        </div>
       </div>
 
       <div class="intro-trust-footer">
@@ -455,6 +455,10 @@
       </div>
     </div>
 
-    <div id="root" class="hidden"></div>
+    <!-- #root starts VISIBLE so the React popup paints instantly for the
+         99 % of users who already activated Alparslan. The intro overlay
+         only steals the screen if intro-screen.ts decides activation is
+         needed, eliminating the blank/intro flash users were seeing. -->
+    <div id="root"></div>
   </body>
 </html>

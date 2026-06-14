@@ -151,8 +151,14 @@ describe("Trusted name as substring — NOW CAUGHT", () => {
     expect(result.reason).toBe("contains-trusted-name");
   });
 
-  it("catches hepsiburadaindirim.com (long trusted name embedded)", () => {
+
+  it("does NOT flag hepsiburadaindirim.com (DEFAULT brand, only LOW_RISK keyword)", () => {
     const result = checkTyposquatting("hepsiburadaindirim.com");
+    expect(result.isSuspicious).toBe(false);
+  });
+
+  it("catches hepsiburada-indirim.com (separator present — hasSeparator=true path)", () => {
+    const result = checkTyposquatting("hepsiburada-indirim.com");
     expect(result.isSuspicious).toBe(true);
     expect(result.similarTo).toBe("hepsiburada.com");
     expect(result.reason).toBe("contains-trusted-name");
@@ -505,3 +511,117 @@ describe("Full URL scoring with improved detection", () => {
     expect(result.level).toBe(ThreatLevel.DANGEROUS);
   });
 });
+
+// ─── CONTEXTUAL CONTAINS-TRUSTED-NAME (ISSUE #39) ─────────────────
+describe("Contextual contains-trusted-name scoring", () => {
+  describe("false-positive prevention — no keyword and no separator", () => {
+    it("turkiyeacikkaynakplatformu.com → UNKNOWN (GENERIC brand, no signal)", () => {
+      const result = checkTyposquatting("turkiyeacikkaynakplatformu.com");
+      expect(result.isSuspicious).toBe(false);
+    });
+
+    it("garantibelgesi.com → not suspicious (DEFAULT brand, no keyword/separator)", () => {
+      const result = checkTyposquatting("garantibelgesi.com");
+      expect(result.isSuspicious).toBe(false);
+    });
+
+    it("garantiliurunler.com → not suspicious (DEFAULT brand, no keyword/separator)", () => {
+      const result = checkTyposquatting("garantiliurunler.com");
+      expect(result.isSuspicious).toBe(false);
+    });
+
+    it("turkiyeyazilimvakfi.org → not suspicious (GENERIC brand, ratio too large)", () => {
+      const result = checkTyposquatting("turkiyeyazilimvakfi.org");
+      expect(result.isSuspicious).toBe(false);
+    });
+
+    it("isbasiplatformu.com → not suspicious ('isbasi' does not contain 'isbank')", () => {
+      const result = checkTyposquatting("isbasiplatformu.com");
+      expect(result.isSuspicious).toBe(false);
+    });
+  });
+
+  describe("true-positive assurance — keyword or separator present", () => {
+    it("turkiye-giris.com → suspicious (GENERIC + separator + keyword)", () => {
+      const result = checkTyposquatting("turkiye-giris.com");
+      expect(result.isSuspicious).toBe(true);
+      expect(result.reason).toBe("contains-trusted-name");
+    });
+
+    it("garanti-online-giris.com → suspicious (DEFAULT + separator + keyword)", () => {
+      const result = checkTyposquatting("garanti-online-giris.com");
+      expect(result.isSuspicious).toBe(true);
+      expect(result.reason).toBe("contains-trusted-name");
+    });
+
+    it("login-akbank-hesabim.com → suspicious (DEFAULT + separator + keyword)", () => {
+      const result = checkTyposquatting("login-akbank-hesabim.com");
+      expect(result.isSuspicious).toBe(true);
+      expect(result.reason).toBe("contains-trusted-name");
+    });
+
+    it("turkiyegiris.com → suspicious (GENERIC + keyword, ratio 1.71 < 2.0)", () => {
+      const result = checkTyposquatting("turkiyegiris.com");
+      expect(result.isSuspicious).toBe(true);
+      expect(result.reason).toBe("contains-trusted-name");
+    });
+  });
+});
+
+// ─── BEST-MATCH CANDIDATE SELECTION ──────────────────────────────
+describe("Best-match candidate selection", () => {
+  it("edit-distance beats contains-trusted-name for same trusted domain", () => {
+    // "isbankk" is distance-1 from "isbank" (priority 1) AND contains "isbank" (priority 4)
+    // edit-distance should win
+    const result = checkTyposquatting("isbankk.com.tr");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.reason).toBe("edit-distance");
+  });
+
+  it("subdomain-impersonation beats tld-mismatch (priority 2 < 3)", () => {
+    // garanti.evil.com: subdomain "garanti" = exact trusted name → subdomain-impersonation
+    // If tld-mismatch also matched, subdomain-impersonation (priority 2) should win
+    const result = checkTyposquatting("garanti.evil.com");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.reason).toBe("subdomain-impersonation");
+  });
+
+  it("garanti-online-giris.com returns reason contains-trusted-name", () => {
+    const result = checkTyposquatting("garanti-online-giris.com");
+    expect(result.isSuspicious).toBe(true);
+    expect(result.reason).toBe("contains-trusted-name");
+    expect(result.similarTo).toBe("garanti.com.tr");
+  });
+});
+
+
+describe("Letter-doubling (doubled-char) attack detection", () => {
+  it.each([
+    // [domain, expectedSimilarTo]
+    ["garrantii.com.tr", "garanti.com.tr"],
+    ["issbank.com.tr", "isbank.com.tr"],
+    ["akbannk.com", "akbank.com.tr"],
+  ])("%s → detected as edit-distance typosquat of %s", (domain, similarTo) => {
+    const result = checkTyposquatting(domain);
+    expect(result.isSuspicious).toBe(true);
+    expect(result.similarTo).toBe(similarTo);
+    expect(result.reason).toBe("edit-distance");
+  });
+
+  it.each([
+    // These have distance=2 & lenDiff=2 but no consecutive duplicate → must NOT match
+    "goturkiye.com",   // "go" prefix, no repeated char
+    "newisbank.com",   // "new" prefix, no repeated char — lenDiff=3, caught by shortName
+  ])("%s → NOT flagged by doubled-char heuristic (no consecutive duplicate)", (domain) => {
+    const result = checkTyposquatting(domain);
+    // goturkiye: no consecutive repeat → isDoubledCharAttack=false
+    // Should stay UNKNOWN (edit-distance path only fires for distance<=2 && lenDiff<=1)
+    if (domain === "goturkiye.com") {
+      expect(result.isSuspicious).toBe(false);
+    } else {
+      // newisbank: lenDiff=3 so shortName guard or distance>2 prevents it
+      expect(result.isSuspicious).toBe(false);
+    }
+  });
+});
+

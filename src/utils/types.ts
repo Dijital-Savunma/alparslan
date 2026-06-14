@@ -28,6 +28,13 @@ export interface ExtensionSettings {
   networkBlockingEnabled: boolean;
   urlCacheTtlMinutes: number;
   showDomWarnings: boolean;
+  darkMode: boolean;
+  /**
+   * "Konuşma Balonu ile Anlatım": when true, the status panel adds a row
+   * showing an Alparslan avatar + a colour-coded speech bubble with a plain-
+   * language verdict instead of (just) the technical SAFE/SUSPICIOUS labels.
+   */
+  speechBubbleEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
@@ -38,6 +45,8 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   networkBlockingEnabled: false,
   urlCacheTtlMinutes: 5,
   showDomWarnings: true,
+  darkMode: false,
+  speechBubbleEnabled: true,
 };
 
 export interface ExtensionStats {

@@ -1,11 +1,15 @@
 import { test, expect } from "../fixtures/extension";
 import { openPopup, navigateToSite } from "../helpers/extension-page";
+import { routeCommonSites } from "../helpers/site-routes";
 
 test.describe("Breach Check — Happy Path", () => {
   // The popup reads the active tab via chrome.tabs.query({ active: true, currentWindow: true }),
   // but opening the popup as a new page makes it the active tab instead of the linkedin page.
   // This means the breach badge cannot show the linkedin domain in this testing setup.
-  test.fixme("should show breach badge in popup for known breached site", async ({ context, extensionId }) => {
+  test.fixme("should show breach badge in popup for known breached site", async ({
+    context,
+    extensionId,
+  }) => {
     const page = await navigateToSite(context, "https://www.linkedin.com");
     await page.waitForTimeout(2000);
 
@@ -15,7 +19,8 @@ test.describe("Breach Check — Happy Path", () => {
     await page.close();
   });
 
-  test("should show breach info banner on page of breached site", async ({ context, extensionId }) => {
+  test("should show breach info banner on page of breached site", async ({ context }) => {
+    await routeCommonSites(context);
     const page = await navigateToSite(context, "https://www.linkedin.com");
     await page.waitForTimeout(2000);
 
@@ -25,6 +30,7 @@ test.describe("Breach Check — Happy Path", () => {
   });
 
   test("should not show breach badge for non-breached site", async ({ context, extensionId }) => {
+    await routeCommonSites(context);
     const page = await navigateToSite(context, "https://example.com");
     await page.waitForTimeout(1500);
 
@@ -49,7 +55,10 @@ test.describe("Breach Check — Happy Path", () => {
 });
 
 test.describe("Breach Check — Negative Scenarios", () => {
-  test("negative: should not show breach banner on extension pages", async ({ context, extensionId }) => {
+  test("negative: should not show breach banner on extension pages", async ({
+    context,
+    extensionId,
+  }) => {
     const popup = await openPopup(context, extensionId);
     const breachCount = await popup.getByText(/veri sizintisi/).count();
     expect(breachCount).toBe(0);
@@ -70,7 +79,8 @@ test.describe("Breach Check — Negative Scenarios", () => {
     await page.close();
   });
 
-  test("negative: breach banner host should be removable from DOM", async ({ context, extensionId }) => {
+  test("negative: breach banner host should be removable from DOM", async ({ context }) => {
+    await routeCommonSites(context);
     const page = await navigateToSite(context, "https://www.linkedin.com");
     await page.waitForTimeout(2000);
 

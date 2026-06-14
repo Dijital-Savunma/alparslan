@@ -13,7 +13,7 @@ const TABS: { id: TabId; label: string; title: string }[] = [
 
 export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
   return (
-    <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb", background: "white" }}>
+    <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
       {TABS.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
@@ -22,7 +22,7 @@ export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
             onClick={() => onTabChange(tab.id)}
             title={tab.title}
             onMouseEnter={(e) => {
-              if (!isActive) e.currentTarget.style.background = "#e2e8f0";
+              if (!isActive) e.currentTarget.style.background = "var(--surface-card-hover)";
             }}
             onMouseLeave={(e) => {
               if (!isActive) e.currentTarget.style.background = "transparent";
@@ -30,11 +30,11 @@ export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
             style={{
               flex: 1,
               padding: "8px 0",
-              background: isActive ? "#f8fafc" : "transparent",
+              background: isActive ? "var(--surface-elevated)" : "transparent",
               boxShadow: isActive ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
               border: "none",
               borderBottom: isActive ? "2px solid #3b82f6" : "2px solid transparent",
-              color: isActive ? "#3b82f6" : "#6b7280",
+              color: isActive ? "#3b82f6" : "var(--text-muted)",
               fontWeight: isActive ? 600 : 400,
               fontSize: 13,
               cursor: "pointer",

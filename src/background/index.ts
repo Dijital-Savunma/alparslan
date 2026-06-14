@@ -118,9 +118,11 @@ function updateProgress(stepIndex: number, ms?: number): void {
   if (ms !== undefined) initProgress.steps[stepIndex].ms = ms;
   const done = initProgress.steps.filter((s) => s.done).length;
   initProgress.percent = Math.round((done / initProgress.steps.length) * 100);
-  initProgress.step = stepIndex < initProgress.steps.length - 1
-    ? initProgress.steps[stepIndex + 1].name + " " + t.init.loadingSuffix
-    : t.init.ready;
+  // Label always reflects the FIRST still-pending step, not stepIndex+1. This
+  // keeps the text correct (and never running backwards) when the parallel
+  // steps below finish out of order.
+  const nextPending = initProgress.steps.find((s) => !s.done);
+  initProgress.step = nextPending ? nextPending.name + " " + t.init.loadingSuffix : t.init.ready;
 }
 
 async function initServiceWorker(): Promise<void> {
@@ -171,27 +173,25 @@ async function initServiceWorker(): Promise<void> {
   initTimings.cacheInit = Date.now() - t1;
   updateProgress(1, initTimings.cacheInit);
 
-  // Steps 3-5: USOM + whitelist + breach (parallel)
+  // Steps 3-5: USOM + whitelist + breach run in parallel, but each reports its
+  // OWN progress the moment it settles — so the bar climbs 40→60→80→100
+  // smoothly instead of jumping straight from 40 to 100 when all three finish
+  // together.
   initProgress.step = t.init.usom + " " + t.init.loadingSuffix;
   const t2 = Date.now();
 
-  const [usomResult, wlResult, breachResult] = await Promise.allSettled([
-    initUsomBlocklist(),
-    initWhitelist(),
-    initBreachCache(),
-  ]);
+  const usomP = initUsomBlocklist()
+    .catch((e) => logger.warn("USOM init failed:", e))
+    .finally(() => updateProgress(2, Date.now() - t2));
+  const wlP = initWhitelist()
+    .catch((e) => logger.warn("Whitelist init failed:", e))
+    .finally(() => updateProgress(3, Date.now() - t2));
+  const breachP = initBreachCache()
+    .catch((e) => logger.warn("Breach init failed:", e))
+    .finally(() => updateProgress(4, Date.now() - t2));
 
-  const t2end = Date.now() - t2;
-  initTimings.usomWhitelistBreach = t2end;
-
-  updateProgress(2, t2end); // USOM
-  if (usomResult.status === "rejected") logger.warn("USOM init failed:", usomResult.reason);
-
-  updateProgress(3, t2end); // Whitelist
-  if (wlResult.status === "rejected") logger.warn("Whitelist init failed:", wlResult.reason);
-
-  updateProgress(4, t2end); // Breach
-  if (breachResult.status === "rejected") logger.warn("Breach init failed:", breachResult.reason);
+  await Promise.allSettled([usomP, wlP, breachP]);
+  initTimings.usomWhitelistBreach = Date.now() - t2;
 
   // Set URL check cache TTL from settings
   setTtlMinutes(state.settings.urlCacheTtlMinutes);
@@ -206,6 +206,13 @@ async function initServiceWorker(): Promise<void> {
   initProgress.step = t.init.ready;
   initProgress.percent = 100;
   initDone = true;
+
+  // Mark that the loading UI has run once for THIS browser session. session
+  // storage lives in memory and is wiped when Chrome fully closes, but it
+  // survives service-worker restarts within the session — so the popup shows
+  // the loading bar only on the first cold start, never again on the silent
+  // worker re-inits that happen during normal browsing.
+  chrome.storage.session?.set?.({ alparslanInitDone: true });
   e2eReadiness.swInitDone = true;
   resolveInit();
   logger.debug(`Service worker initialized in ${initTimings.total}ms (storage: ${initTimings.storageLoad}ms, cache: ${initTimings.cacheInit}ms)`);
@@ -235,6 +242,73 @@ async function initServiceWorker(): Promise<void> {
 
 initServiceWorker().catch((err) => {
   logger.warn("Service worker init error:", err);
+});
+
+// Reset session-only counters whenever Chrome appears to be freshly opened.
+//
+// Kontrol / Tehdit / Tracker / Bilinmeyen sayaçları "bu oturumda olanları"
+// göstermek için kullanıcı talebi: kalıcı (1700+ Kontrol) sayılar yerine
+// Chrome her başlatıldığında sıfırdan saymaya başlasın.
+//
+// @mertinkos review yorumu: Eski yaklaşım `chrome.windows.onCreated` +
+// `windows.length === 1` race condition'a açıktı. İki pencere hızlıca
+// açılırsa length 2 gelip reset atlanabiliyordu; tray modunda gizli
+// bir pencere varsa length hep > 1 olup hiç tetiklenmiyordu.
+//
+// Yeni yaklaşım: Service worker MV3'te Chrome her açıldığında sıfırdan
+// başlar ve `chrome.storage.session` de Chrome kapanınca uçar. Bu ikisi
+// birbirinin "tazeliğini" doğrular — SW init sırasında session
+// storage'da `sessionStart` damgası yoksa demek ki bu Chrome'un
+// gerçekten taze açıldığı an. Damga varsa SW sadece uykudan uyandı,
+// sayaçlara dokunmuyoruz.
+//
+// Sadece SESSION sayaclarini (state.stats) sifirlar — taze gun, taze
+// "Engellenen Tehdit / Tarama" sayim. state.history (kullanicinin kalici
+// tarama gecmisi) DOKUNULMAZ; her Chrome restart'inda silinmesi kotu UX
+// olurdu, kullanici uzun donemli geçmisini kaybederdi.
+// Popup'taki UNKNOWN sayimi history.filter ile hesaplaniyor — bu sayede
+// session reset olsa bile geçmis korunur, sayimlar dogru gösterilir.
+const SESSION_START_KEY = "alparslanSessionStart";
+
+function resetSessionCounters(reason: string): void {
+  logger.debug(`Session reset: ${reason}`);
+  state.stats = { ...DEFAULT_STATS };
+  chrome.storage.sync.set({ stats: state.stats });
+}
+
+async function maybeStartNewChromeSession(): Promise<void> {
+  // chrome.storage.session olmayan ortamlarda (test mock'ları, eski
+  // Chrome sürümleri) sessizce çık — yanlış tetiklenip sayaçları
+  // bozmaktansa hiç yapmamak daha güvenli.
+  if (!chrome.storage?.session?.get || !chrome.storage?.session?.set) {
+    return;
+  }
+  try {
+    const result = await new Promise<Record<string, unknown>>((resolve) => {
+      chrome.storage.session.get(SESSION_START_KEY, (r) => resolve(r || {}));
+    });
+    if (result[SESSION_START_KEY]) {
+      // SW sadece uykudan uyandı; Chrome oturumu devam ediyor.
+      return;
+    }
+    // Damga yok → taze Chrome oturumu. Önce damgayı bas (race'leri kes),
+    // sonra sayaçları sıfırla.
+    await new Promise<void>((resolve) => {
+      chrome.storage.session.set({ [SESSION_START_KEY]: Date.now() }, () => resolve());
+    });
+    resetSessionCounters("fresh chrome session (no sessionStart stamp)");
+  } catch (err) {
+    logger.warn("Session start check failed:", err);
+  }
+}
+
+maybeStartNewChromeSession();
+
+// `chrome.runtime.onStartup` artık birincil mekanizma değil ama hâlâ
+// faydalı bir ek sinyal: bazı Chrome sürümlerinde SW init'ten daha
+// erken ateşlenir ve damga kontrolünü ikinci kez tetikler (idempotent).
+chrome.runtime.onStartup?.addListener?.(() => {
+  maybeStartNewChromeSession();
 });
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -307,6 +381,11 @@ const PRIVILEGED_MESSAGE_TYPES = new Set([
   "ADD_TO_WHITELIST",
   "REMOVE_FROM_WHITELIST",
   "CLEAR_HISTORY",
+  // RESET_SCORE: stats + history + weeklyMetrics tamamen sifirlar. Bir
+  // sitenin content script'i chrome.runtime.sendMessage ile cagirsa
+  // kullanicinin tum skor verisini disardan silebiliyordu — guvenlik
+  // acigi. Yalniz extension-own pages (popup, options) cagirabilir.
+  "RESET_SCORE",
 ]);
 
 function isFromExtensionPage(sender: chrome.runtime.MessageSender): boolean {
@@ -376,6 +455,11 @@ chrome.runtime.onMessage.addListener(
         const result = await checkUrlConfirmed(url, state.settings.protectionLevel);
         if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
           state.stats.threatsBlocked++;
+        }
+        // Record DANGEROUS / SUSPICIOUS / UNKNOWN — the dashboard score
+        // penalises all three (UNKNOWN counts too because we couldn't
+        // confidently mark it safe).
+        if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS" || result.level === "UNKNOWN") {
           recordThreatVisit(result.level);
         }
         persistStats();
@@ -421,7 +505,10 @@ chrome.runtime.onMessage.addListener(
     if (message.type === "SETTINGS_UPDATED") {
       const newSettings = message.settings as ExtensionSettings;
       const oldSettings = state.settings;
-      state.settings = newSettings;
+      // Merge with defaults so an incoming partial settings object (e.g.
+      // intro-screen activation that doesn't include every boolean) doesn't
+      // accidentally drop keys like `speechBubbleEnabled` to undefined.
+      state.settings = { ...DEFAULT_SETTINGS, ...newSettings };
 
       // Update URL cache TTL
       setTtlMinutes(newSettings.urlCacheTtlMinutes);
@@ -474,10 +561,79 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
+    // "Skoru Sıfırla" — kullanici dashboard butonundan tek tikla haftalik
+    // metrikleri ve oturum istatistiklerini sifirlar. settings, beyaz liste
+    // gibi diger sync verilerine dokunmaz; "Tüm Verileri Temizle"den daha
+    // hedefli bir aksiyondur.
+    if (message.type === "RESET_SCORE") {
+      state.stats = { ...DEFAULT_STATS };
+      state.history = [];
+      chrome.storage.sync.set({ stats: state.stats });
+      chrome.storage.local.set({ history: state.history });
+      chrome.storage.sync.remove(["weeklyMetrics", "previousWeekMetrics"], () => {
+        sendResponse({ ok: true });
+      });
+      return true;
+    }
+
     if (message.type === "TRACKER_BLOCKED") {
       state.stats.trackersBlocked++;
       persistStats();
       recordTrackerBlocked();
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    // Breach banner uyarisini bir domain icin susturma istegi. Eskiden
+    // content script (src/content/index.ts) chrome.storage.local'i direkt
+    // yaziyordu — content script web sayfasi context'inde calistigi icin
+    // injection riski tasiyordu. @mertinkos review yorumu uzerine yazim
+    // background'a tasindi: burada domain valide edilir, sonra yazilir.
+    // Content script artik sadece bu mesaji gonderir, kalici belege
+    // dokunamaz.
+    if (message.type === "DISMISS_BREACH_DOMAIN") {
+      const BREACH_DISMISSED_KEY = "alparslan-breach-dismissed-domains";
+      const rawDomain = message.domain;
+      // Sanitize: yalniz string + makul uzunluk + tehlikeli karakter yok.
+      // Hostname yapisi disindaki bir seyi storage'a kaydetmiyoruz.
+      if (typeof rawDomain !== "string" || rawDomain.length === 0 || rawDomain.length > 253) {
+        sendResponse({ ok: false, reason: "invalid_domain" });
+        return true;
+      }
+      if (!/^[a-z0-9.-]+$/i.test(rawDomain)) {
+        sendResponse({ ok: false, reason: "invalid_chars" });
+        return true;
+      }
+      chrome.storage.local.get([BREACH_DISMISSED_KEY], (result) => {
+        const list = (result[BREACH_DISMISSED_KEY] as string[] | undefined) || [];
+        if (!list.includes(rawDomain)) {
+          list.push(rawDomain);
+          chrome.storage.local.set({ [BREACH_DISMISSED_KEY]: list }, () => {
+            sendResponse({ ok: true });
+          });
+        } else {
+          sendResponse({ ok: true });
+        }
+      });
+      return true;
+    }
+
+    // The popup short-circuits CHECK_URL for chrome:// and about: pages (we
+    // can't actually analyze browser-internal pages), so without this they
+    // never reach the history → the "Bilinmeyen" counter stayed at 0 even
+    // when the popup showed "Bilinmiyor". Record them here so the counter
+    // and list reflect what the user sees. Simple dedup against the most
+    // recent entry prevents spamming when the popup is reopened on the
+    // same internal page.
+    if (message.type === "RECORD_UNKNOWN_VIEW") {
+      const url = message.url;
+      if (typeof url === "string" && url) {
+        const safeUrl = sanitizeUrlForStorage(url);
+        const last = state.history[0];
+        if (!last || last.url !== safeUrl || last.level !== "UNKNOWN") {
+          addHistoryEntry(url, "UNKNOWN", 0);
+        }
+      }
       sendResponse({ ok: true });
       return true;
     }
@@ -567,8 +723,50 @@ chrome.runtime.onMessage.addListener(
       (async () => {
         const currentWeek = await collectCurrentWeekMetrics();
         const previousWeek = await collectPreviousWeekMetrics();
-        const dashboard = calculateScore(currentWeek);
+        // Ayarlari her seferinde TAZE olarak chrome.storage.sync'den okuyoruz.
+        // state.settings cache'lenmis olabilir; ozellikle Tum Ayarlar
+        // sayfasindan toggle degisip popup hala acik kaldigi senaryoda
+        // skor yanlis hesaplanmasin diye storage'a guveniyoruz.
+        const freshSettings = await new Promise<ExtensionSettings>((resolve) => {
+          chrome.storage.sync.get(["settings"], (result) => {
+            resolve({ ...DEFAULT_SETTINGS, ...(result.settings as Partial<ExtensionSettings> ?? {}) });
+          });
+        });
+        // Skor BENZERSIZ domain bazinda hesaplanir: ayni siteye 30 kere
+        // girse bile bir kere puan kesilir, sonraki ziyaretler skoru
+        // dusurmez.
+        const uniqueThreatDomains = new Set(
+          state.history
+            .filter((h) => h.level === "DANGEROUS" || h.level === "SUSPICIOUS")
+            .map((h) => h.domain),
+        ).size;
+        const uniqueUnknownDomains = new Set(
+          state.history.filter((h) => h.level === "UNKNOWN").map((h) => h.domain),
+        ).size;
+        const uniqueSafeDomains = new Set(
+          state.history.filter((h) => h.level === "SAFE").map((h) => h.domain),
+        ).size;
+        const syntheticMetrics = {
+          ...currentWeek,
+          dangerousSitesVisited: 0,
+          suspiciousSitesVisited: uniqueThreatDomains,
+          unknownSitesVisited: uniqueUnknownDomains,
+        };
+        const dashboard = calculateScore(syntheticMetrics, {
+          networkMonitoringEnabled: freshSettings.networkMonitoringEnabled,
+          uniqueSafeDomainCount: uniqueSafeDomains,
+        });
         dashboard.previousWeek = previousWeek;
+        // Skor Analizi panosu icin TAM olarak skor hesabinda kullandigimiz
+        // sayilari da paylasiyoruz. Boylece popup kendi history state'inden
+        // tekrar saymak zorunda kalmiyor; aynı kaynaktan veri = uyusmamazlik
+        // yok.
+        dashboard.insightCounts = {
+          uniqueSafe: uniqueSafeDomains,
+          uniqueThreat: uniqueThreatDomains,
+          uniqueUnknown: uniqueUnknownDomains,
+          scanOn: freshSettings.networkMonitoringEnabled !== false,
+        };
         sendResponse({ dashboard });
       })();
       return true;

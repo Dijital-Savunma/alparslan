@@ -277,7 +277,7 @@ describe("Background Service Worker", () => {
       );
 
       expect(sendResponse).toHaveBeenCalledWith(
-        expect.objectContaining({ level: "SAFE", reasons: ["Beyaz listede"] }),
+        expect.objectContaining({ level: "SAFE", reasons: ["Güvenilir bağlantı listemde"] }),
       );
     });
   });
@@ -404,6 +404,115 @@ describe("Background Service Worker", () => {
     });
   });
 
+  // @mertinkos review yorumu: "RESET_SCORE icin test eklenebilir".
+  // CLEAR_HISTORY'den daha agir bir aksiyon — sadece history degil,
+  // state.stats ve sync.weeklyMetrics/previousWeekMetrics da uctugu icin
+  // dogru anahtarlarin sifirlandigini ayri ayri dogruluyoruz.
+  describe("RESET_SCORE message", () => {
+    it("clears stats, history, and weekly metrics keys", async () => {
+      // SW init'in gecmis yuklemesini tamamlamasini bekle
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Sayilarin sifir olmadigi bir baslangic durumu olustur
+      onMessageCallback({ type: "TRACKER_BLOCKED" }, {}, vi.fn());
+      onMessageCallback({ type: "CHECK_URL", url: "https://reset-me.com" }, {}, vi.fn());
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      storageSetMock.mockClear();
+      const removeSpy = vi.fn((_keys: unknown, cb?: () => void) => cb?.());
+      (chrome.storage.sync as unknown as { remove: typeof removeSpy }).remove = removeSpy;
+
+      const sr = vi.fn();
+      onMessageCallback({ type: "RESET_SCORE" }, trustedSender, sr);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(sr).toHaveBeenCalledWith({ ok: true });
+
+      // stats sync'e tum sayilar sifir olarak yazilmali
+      // (chrome.storage.sync.set burada callback'siz cagriliyor, tek arg)
+      expect(storageSetMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stats: expect.objectContaining({
+            urlsChecked: 0,
+            threatsBlocked: 0,
+            trackersBlocked: 0,
+          }),
+        }),
+      );
+
+      // history local'e bos array olarak yazilmali
+      const localSetMock = chrome.storage.local.set as ReturnType<typeof vi.fn>;
+      expect(localSetMock).toHaveBeenCalledWith(
+        expect.objectContaining({ history: [] }),
+      );
+
+      // weeklyMetrics + previousWeekMetrics sync'ten temizlenmeli
+      expect(removeSpy).toHaveBeenCalledWith(
+        ["weeklyMetrics", "previousWeekMetrics"],
+        expect.any(Function),
+      );
+
+      // RAM tarafinda da history bos olmali
+      const sr2 = vi.fn();
+      onMessageCallback({ type: "GET_HISTORY" }, {}, sr2);
+      expect(sr2.mock.calls[0][0].history).toEqual([]);
+    });
+  });
+
+  // @mertinkos review yorumu: "RECORD_UNKNOWN_VIEW icin test eklenebilir".
+  // Popup chrome:// ve about: sayfalarinda CHECK_URL'i kisa devre yapar;
+  // bu mesaj o sayfalari yine de "Bilinmeyen" olarak gecmise yazar. Iki
+  // davranis kritik: (a) URL kayda gecer, (b) ayni URL pes pese gelirse
+  // dedup edilir, geçmiş spam'lenmez.
+  describe("RECORD_UNKNOWN_VIEW message", () => {
+    it("appends an UNKNOWN history entry for the given URL", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      onMessageCallback({ type: "CLEAR_HISTORY" }, trustedSender, vi.fn());
+
+      const sr = vi.fn();
+      onMessageCallback(
+        { type: "RECORD_UNKNOWN_VIEW", url: "chrome://newtab/" },
+        {},
+        sr,
+      );
+      expect(sr).toHaveBeenCalledWith({ ok: true });
+
+      const getSr = vi.fn();
+      onMessageCallback({ type: "GET_HISTORY" }, {}, getSr);
+      const history = getSr.mock.calls[0][0].history;
+      expect(history.length).toBe(1);
+      expect(history[0].level).toBe("UNKNOWN");
+    });
+
+    it("dedupes repeated UNKNOWN view of the same URL", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      onMessageCallback({ type: "CLEAR_HISTORY" }, trustedSender, vi.fn());
+
+      // Ayni URL'i pes pese 3 kez bildir
+      onMessageCallback({ type: "RECORD_UNKNOWN_VIEW", url: "chrome://extensions" }, {}, vi.fn());
+      onMessageCallback({ type: "RECORD_UNKNOWN_VIEW", url: "chrome://extensions" }, {}, vi.fn());
+      onMessageCallback({ type: "RECORD_UNKNOWN_VIEW", url: "chrome://extensions" }, {}, vi.fn());
+
+      const getSr = vi.fn();
+      onMessageCallback({ type: "GET_HISTORY" }, {}, getSr);
+      expect(getSr.mock.calls[0][0].history.length).toBe(1);
+    });
+
+    it("ignores malformed payloads without throwing", () => {
+      const sr1 = vi.fn();
+      onMessageCallback({ type: "RECORD_UNKNOWN_VIEW" }, {}, sr1);
+      expect(sr1).toHaveBeenCalledWith({ ok: true });
+
+      const sr2 = vi.fn();
+      onMessageCallback({ type: "RECORD_UNKNOWN_VIEW", url: 42 }, {}, sr2);
+      expect(sr2).toHaveBeenCalledWith({ ok: true });
+
+      const sr3 = vi.fn();
+      onMessageCallback({ type: "RECORD_UNKNOWN_VIEW", url: "" }, {}, sr3);
+      expect(sr3).toHaveBeenCalledWith({ ok: true });
+    });
+  });
+
   describe("PAGE_ANALYSIS message", () => {
     it("should store page analysis for a domain", () => {
       const sendResponse = vi.fn();
@@ -492,6 +601,10 @@ describe("Background Service Worker", () => {
       { type: "ADD_TO_WHITELIST", domain: "attacker-injected.com" },
       { type: "REMOVE_FROM_WHITELIST", domain: "anything.com" },
       { type: "CLEAR_HISTORY" },
+      // RESET_SCORE: stats + history + weeklyMetrics komple sifirlar.
+      // Privileged guard'da olmazsa rastgele bir sitenin content script'i
+      // sendMessage ile haftalik skoru disardan silebilir (@mertinkos).
+      { type: "RESET_SCORE" },
     ];
 
     it.each(privilegedTypes)(

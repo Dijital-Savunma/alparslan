@@ -26,6 +26,8 @@ describe("normalizeWhitelistInput", () => {
       ["https://example.com?q=1", "example.com"],
       ["https://example.com#section", "example.com"],
       ["https://www.example.com/login?token=abc", "www.example.com"],
+      ["https://www.example.com:8443/login?token=abc", "www.example.com"],
+      ["https://login.akbank.com.tr/path", "login.akbank.com.tr"],
     ])("%s → %s", (input, expected) => {
       expect(normalizeWhitelistInput(input)).toBe(expected);
     });
@@ -62,6 +64,12 @@ describe("normalizeWhitelistInput", () => {
       ["com.tr"],    // compound public suffix
       ["co.uk"],
       ["gov.tr"],
+      ["github.io"],
+      ["pages.dev"],
+      ["blogspot.com"],
+      ["https://github.io/"],
+      ["https://pages.dev/"],
+      ["https://blogspot.com/"],
       ["https://co.uk/"],   // URL-shaped public suffix
       ["http://"],   // malformed URL
       ["://"],
@@ -69,6 +77,17 @@ describe("normalizeWhitelistInput", () => {
       ["..."],
     ])("%s → empty", (input) => {
       expect(normalizeWhitelistInput(input)).toBe("");
+    });
+  });
+
+  describe("allows private-suffix registrable domains", () => {
+    it.each([
+      ["foo.github.io", "foo.github.io"],
+      ["https://foo.pages.dev/path", "foo.pages.dev"],
+      ["foo.blogspot.com", "foo.blogspot.com"],
+      ["bar.foo.github.io", "bar.foo.github.io"],
+    ])("%s → %s", (input, expected) => {
+      expect(normalizeWhitelistInput(input)).toBe(expected);
     });
   });
 });
