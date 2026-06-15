@@ -36,7 +36,6 @@
     "webRequestBlocking",
     "<all_urls>"
   ],
-  "web_accessible_resources": ["icons/alparslan_logo.svg"],
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true

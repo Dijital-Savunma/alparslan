@@ -2,6 +2,11 @@
 // Not: browser-polyfill import edilmez — content script'te chrome zaten mevcut
 import { analyzePage } from "@/detector/page-analyzer";
 import t from "@/i18n/tr";
+// SVG logoyu bundle'a inline gomuyoruz. <img src="chrome-extension://...">
+// yaklasimi web_accessible_resources tanimli olsa bile bazi sitelerin
+// sıkı img-src CSP'sinde bloklaniyordu (edevlet, bankalar vb.). Inline
+// XML'de bu boyut tamamen atlatilir — shadow DOM icinde direkt eleman.
+import logoSvgRaw from "../../icons/alparslan_logo.svg?raw";
 
 const BANNER_HOST_ID = "alparslan-warning-host";
 const BREACH_BANNER_HOST_ID = "alparslan-breach-host";
@@ -37,7 +42,6 @@ function createWarningBanner(level: string, reason: string): void {
   // Friendly assistant body \u2014 replaces the raw technical reason ("USOM tehdit
   // listesinde" vb.) with a sentence telling the user what to actually do.
   const body = isDangerous ? t.banner.dangerousBody : t.banner.suspiciousBody;
-  const logoUrl = chrome.runtime.getURL("icons/alparslan_logo.svg");
 
   shadow.innerHTML = `
     <style>
@@ -63,7 +67,13 @@ function createWarningBanner(level: string, reason: string): void {
         height: 34px;
         flex-shrink: 0;
         /* Logoyu dogrudan bannerin uzerinde goster — beyaz daire yok, miger
-           ikonun kendi formu okunsun. */
+           ikonun kendi formu okunsun. Inline SVG; width/height surrogate
+           ile kendi viewBox'ina sigar. */
+      }
+      .banner-logo svg {
+        width: 100%;
+        height: 100%;
+        display: block;
       }
       .banner-title { font-weight: 700; font-size: 15px; letter-spacing: 0.2px; }
       .banner-reason { font-size: 12.5px; opacity: 0.95; margin-top: 4px; line-height: 1.4; max-width: 720px; margin-left: auto; margin-right: auto; }
@@ -86,7 +96,7 @@ function createWarningBanner(level: string, reason: string): void {
     </style>
     <div class="banner" role="alert">
       <div class="banner-titlerow">
-        <img src="${logoUrl}" class="banner-logo" alt="Alparslan" />
+        <span class="banner-logo" role="img" aria-label="Alparslan">${logoSvgRaw}</span>
         <span class="banner-title">${title}</span>
       </div>
       <div class="banner-reason">${escapeHtml(body)}</div>
