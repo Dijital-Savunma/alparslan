@@ -397,7 +397,7 @@ describe("ASCII digit/letter confusables — issue #27", () => {
   });
 
   it("scores digit confusable as 100 → DANGEROUS via checkUrl", () => {
-    const result = checkUrl("https://s0k.com", "medium");
+    const result = checkUrl("https://s0k.com", "medium", true);
     expect(result.score).toBe(100);
     expect(result.level).toBe(ThreatLevel.DANGEROUS);
   });
@@ -477,14 +477,14 @@ describe("Original detection still works (no regressions)", () => {
 // ─── FULL URL CHECK SCORING ──────────────────────────────────────
 describe("Full URL scoring with improved detection", () => {
   it("TLD mismatch scores 60 → SUSPICIOUS at medium", () => {
-    const result = checkUrl("https://turkiye.com", "medium");
+    const result = checkUrl("https://turkiye.com", "medium", true);
     expect(result.score).toBe(60);
     expect(result.level).toBe(ThreatLevel.SUSPICIOUS);
     expect(result.reasons[0]).toContain(t.reasons.tldMismatch);
   });
 
   it("TLD mismatch scores 60 → DANGEROUS at high (threshold 50)", () => {
-    const result = checkUrl("https://turkiye.com", "high");
+    const result = checkUrl("https://turkiye.com", "high", true);
     expect(result.score).toBe(60);
     expect(result.level).toBe(ThreatLevel.DANGEROUS);
   });
@@ -493,20 +493,20 @@ describe("Full URL scoring with improved detection", () => {
     // "securegaranti" contains "garanti" → 50 points
     // domain contains "secure" keyword → 20 points
     // Total: 70 → DANGEROUS at medium threshold (70)
-    const result = checkUrl("https://securegaranti.com.tr", "medium");
+    const result = checkUrl("https://securegaranti.com.tr", "medium", true);
     expect(result.score).toBe(70);
     expect(result.level).toBe(ThreatLevel.DANGEROUS);
     expect(result.reasons).toHaveLength(2);
   });
 
   it("subdomain impersonation scores 65 → SUSPICIOUS at medium", () => {
-    const result = checkUrl("https://garanti.evil.com", "medium");
+    const result = checkUrl("https://garanti.evil.com", "medium", true);
     expect(result.score).toBe(65);
     expect(result.level).toBe(ThreatLevel.SUSPICIOUS);
   });
 
   it("classic edit-distance still scores 70 → DANGEROUS at medium", () => {
-    const result = checkUrl("https://isbenk.com.tr", "medium");
+    const result = checkUrl("https://isbenk.com.tr", "medium", true);
     expect(result.score).toBe(70);
     expect(result.level).toBe(ThreatLevel.DANGEROUS);
   });

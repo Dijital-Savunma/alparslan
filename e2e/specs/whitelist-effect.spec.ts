@@ -1,6 +1,6 @@
 import { test, expect } from "../fixtures/extension";
 import { openOptionsPage } from "../helpers/extension-page";
-import { checkUrl, getListStats } from "../helpers/extension-messaging";
+import { checkUrl, getListStats, setHeuristics } from "../helpers/extension-messaging";
 
 test.describe("Whitelist effect", () => {
   test("added domain increases SW whitelist stats and short-circuits CHECK_URL to SAFE", async ({
@@ -35,6 +35,7 @@ test.describe("Whitelist effect", () => {
     const options = await openOptionsPage(context, extensionId);
     const flagged = "https://isbenk.com.tr/login"; // typosquat of isbank → flagged
 
+    await setHeuristics(options, true);
     const before = await checkUrl(options, flagged);
     expect(["DANGEROUS", "SUSPICIOUS"]).toContain(before.level);
 

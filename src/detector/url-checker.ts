@@ -478,6 +478,7 @@ export function checkTyposquatting(
 export function checkUrl(
   url: string,
   protectionLevel: ExtensionSettings["protectionLevel"] = "medium",
+  heuristics: ExtensionSettings["heuristicsEnabled"] = false,
 ): ThreatResult {
   const canonical = canonicalizeUrl(url);
   const domain = canonical.hostname;
@@ -524,47 +525,51 @@ export function checkUrl(
     return { level: ThreatLevel.UNKNOWN, score: 0, reasons: [], url, checkedAt: now };
   }
 
-  // Medium + High: typosquatting check
-  const typo = checkTyposquatting(domain, canonical);
-  if (typo.isSuspicious) {
-    const reasonLabels: Record<string, { score: number; text: string }> = {
-      "homoglyph": { score: 100, text: t.reasons.homoglyph },
-      "edit-distance": { score: 70, text: t.reasons.editDistance },
-      "tld-mismatch": { score: 60, text: t.reasons.tldMismatch },
-      "contains-trusted-name": { score: 50, text: t.reasons.containsTrusted },
-      "subdomain-impersonation": { score: 65, text: t.reasons.subdomainImpersonation },
-      "subdomain-typosquat": { score: 55, text: t.reasons.subdomainTyposquat },
-    };
-    const match = reasonLabels[typo.reason ?? ""] ?? { score: 70, text: t.reasons.similarDomain };
-    score += match.score;
-    reasons.push(`${typo.similarTo} ile ${match.text}`);
-  }
-
-  if (SUSPICIOUS_KEYWORDS.some((kw) => domain.includes(kw))) {
-    if (!TRUSTED_DOMAINS.has(rootDomain)) {
-      score += 20;
-      reasons.push(t.reasons.suspiciousKeyword);
+  // Medium and High level checkings are executed if heuristics settings is enabled.
+  if (heuristics) {
+    // Medium + High: typosquatting check
+    const typo = checkTyposquatting(domain, canonical);
+    if (typo.isSuspicious) {
+      const reasonLabels: Record<string, { score: number; text: string }> = {
+        "homoglyph": { score: 100, text: t.reasons.homoglyph },
+        "edit-distance": { score: 70, text: t.reasons.editDistance },
+        "tld-mismatch": { score: 60, text: t.reasons.tldMismatch },
+        "contains-trusted-name": { score: 50, text: t.reasons.containsTrusted },
+        "subdomain-impersonation": { score: 65, text: t.reasons.subdomainImpersonation },
+        "subdomain-typosquat": { score: 55, text: t.reasons.subdomainTyposquat },
+      };
+      const match = reasonLabels[typo.reason ?? ""] ?? { score: 70, text: t.reasons.similarDomain };
+      score += match.score;
+      reasons.push(`${typo.similarTo} ile ${match.text}`);
     }
-  }
 
-  // Medium + High: IP-based URL check
-  if (domain.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) {
-    score += 30;
-    reasons.push(t.reasons.ipAccess);
-  }
+    if (SUSPICIOUS_KEYWORDS.some((kw) => domain.includes(kw))) {
+      if (!TRUSTED_DOMAINS.has(rootDomain)) {
+        score += 20;
+        reasons.push(t.reasons.suspiciousKeyword);
+      }
+    }
 
-  // Medium + High: excessive subdomain check
-  const subdomainCount = canonical.subdomain ? canonical.subdomain.split(".").length : 0;
-  if (subdomainCount > 3) {
-    score += 15;
-    reasons.push(t.reasons.excessiveSubdomains);
-  }
+    // Medium + High: IP-based URL check
+    if (domain.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) {
+      score += 30;
+      reasons.push(t.reasons.ipAccess);
+    }
 
-  // Medium + High: risky TLD check
-  const riskyTld = getRiskyTld(domain);
-  if (riskyTld) {
-    score += 15;
-    reasons.push(t.reasons.riskyTld(riskyTld));
+    // Medium + High: excessive subdomain check
+    const subdomainCount = canonical.subdomain ? canonical.subdomain.split(".").length : 0;
+    if (subdomainCount > 3) {
+      score += 15;
+      reasons.push(t.reasons.excessiveSubdomains);
+    }
+
+    // Medium + High: risky TLD check
+    const riskyTld = getRiskyTld(domain);
+    if (riskyTld) {
+      score += 15;
+      reasons.push(t.reasons.riskyTld(riskyTld));
+    }
+
   }
 
   // High protection: lower thresholds for more aggressive detection
@@ -573,9 +578,9 @@ export function checkUrl(
 
   // Determine threat level
   let level: ThreatLevel;
-  if (score >= dangerousThreshold) {
+  if (heuristics && score >= dangerousThreshold) {
     level = ThreatLevel.DANGEROUS;
-  } else if (score >= suspiciousThreshold) {
+  } else if (heuristics && score >= suspiciousThreshold) {
     level = ThreatLevel.SUSPICIOUS;
   } else if (TRUSTED_DOMAINS.has(rootDomain)) {
     level = ThreatLevel.SAFE;
@@ -593,8 +598,9 @@ export function checkUrl(
 export async function checkUrlConfirmed(
   url: string,
   protectionLevel: ExtensionSettings["protectionLevel"] = "medium",
+  heuristics: ExtensionSettings["heuristicsEnabled"],
 ): Promise<ThreatResult> {
-  const result = checkUrl(url, protectionLevel);
+  const result = checkUrl(url, protectionLevel, heuristics);
 
   // If the sync check flagged it as USOM, confirm via IndexedDB
   if (result.level === ThreatLevel.DANGEROUS && result.reasons.includes(t.reasons.usomListed)) {

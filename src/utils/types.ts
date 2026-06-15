@@ -35,6 +35,7 @@ export interface ExtensionSettings {
    * language verdict instead of (just) the technical SAFE/SUSPICIOUS labels.
    */
   speechBubbleEnabled: boolean;
+  heuristicsEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   showDomWarnings: true,
   darkMode: false,
   speechBubbleEnabled: true,
+  heuristicsEnabled: false,
 };
 
 export interface ExtensionStats {

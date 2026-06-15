@@ -138,7 +138,7 @@ function updateProgress(stepIndex: number, ms?: number): void {
  * "BU SİTE GÜVENLİ DEĞİL" banner + threat badge from the raw checkUrl() re-scan
  * while the popup correctly showed güvenli.
  */
-async function evaluateTab(url: string): Promise<ThreatResult> {
+async function evaluateTab(url: string, heuristics: ExtensionSettings["heuristicsEnabled"]): Promise<ThreatResult> {
   try {
     const hostname = new URL(url).hostname.toLowerCase();
     if (isWhitelisted(hostname)) {
@@ -147,7 +147,7 @@ async function evaluateTab(url: string): Promise<ThreatResult> {
   } catch {
     /* invalid URL — let checkUrlConfirmed produce the verdict */
   }
-  return checkUrlConfirmed(url, state.settings.protectionLevel);
+  return checkUrlConfirmed(url, state.settings.protectionLevel, heuristics);
 }
 
 async function initServiceWorker(): Promise<void> {
@@ -248,7 +248,7 @@ async function initServiceWorker(): Promise<void> {
       if (!tab.id || !tab.url || tab.url.startsWith("chrome") || tab.url.startsWith("about:")) continue;
       // evaluateTab() (whitelist + USOM-confirmed) — never the raw checkUrl(),
       // whose unconfirmed Bloom-filter hit would flash a false danger banner.
-      const result = await evaluateTab(tab.url);
+      const result = await evaluateTab(tab.url, state.settings.heuristicsEnabled);
       updateBadge(tab.id, result.level);
 
       // Push warning directly for dangerous tabs (backup to RESCAN pull)
@@ -258,11 +258,11 @@ async function initServiceWorker(): Promise<void> {
           level: result.level,
           reason: result.reasons.join(", "),
           score: result.score,
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // Also tell content script to re-run full analysis
-      chrome.tabs.sendMessage(tab.id, { type: "RESCAN" }).catch(() => {});
+      chrome.tabs.sendMessage(tab.id, { type: "RESCAN" }).catch(() => { });
     }
   });
 }
@@ -349,7 +349,7 @@ chrome.runtime.onInstalled.addListener(() => {
         chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: blockRuleIds });
         logger.debug(`Cleared ${blockRuleIds.length} leftover DNR rules`);
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   // Load built-in blocklist into IndexedDB (migration handles existing data)
@@ -470,7 +470,7 @@ chrome.runtime.onMessage.addListener(
         // Single verdict path (whitelist short-circuit + USOM-confirmed check),
         // shared with the badge/banner paths via evaluateTab() so the popup and
         // the page banner can never disagree.
-        const result = await evaluateTab(url);
+        const result = await evaluateTab(url, state.settings.heuristicsEnabled);
         if (result.level === "DANGEROUS" || result.level === "SUSPICIOUS") {
           state.stats.threatsBlocked++;
         }
@@ -846,7 +846,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
     (async () => {
       if (!initDone) await initReady;
-      const result = await evaluateTab(url);
+      const result = await evaluateTab(url, state.settings.heuristicsEnabled);
       updateBadge(tabId, result.level);
 
       if ((result.level === "DANGEROUS" || result.level === "SUSPICIOUS") && state.settings.showDomWarnings !== false) {
@@ -855,7 +855,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
           level: result.level,
           reason: result.reasons.join(", "),
           score: result.score,
-        }).catch(() => {});
+        }).catch(() => { });
       }
     })();
   }

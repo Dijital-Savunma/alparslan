@@ -115,7 +115,7 @@ function onBeforeRequest(details: chrome.webRequest.WebRequestBodyDetails): chro
       if (IS_FIREFOX) {
         return { cancel: true };
       }
-      addDnrBlockRule(domain).catch(() => {});
+      addDnrBlockRule(domain).catch(() => { });
     }
 
     if (details.type === "main_frame" || details.type === "sub_frame") {
@@ -144,7 +144,7 @@ function onBeforeRequest(details: chrome.webRequest.WebRequestBodyDetails): chro
     }
 
     const t0 = performance.now();
-    const result = checkUrl(details.url, currentSettings.protectionLevel);
+    const result = checkUrl(details.url, currentSettings.protectionLevel, currentSettings.heuristicsEnabled);
     const elapsed = performance.now() - t0;
     setCachedResult(domain, result);
 

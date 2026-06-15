@@ -5,6 +5,7 @@
 
 import { test, expect } from "../fixtures/extension";
 import type { Page, BrowserContext } from "@playwright/test";
+import { setHeuristics } from "../helpers/extension-messaging";
 
 interface CheckUrlResult {
   level: "SAFE" | "SUSPICIOUS" | "DANGEROUS" | "UNKNOWN";
@@ -35,6 +36,7 @@ async function checkUrlLive(page: Page, url: string): Promise<CheckUrlResult> {
 test.describe("Phase 3 — Live detection through background SW", () => {
   test("typosquat flagged via live SW", async ({ context, extensionId }) => {
     const page = await openExtensionContextPage(context, extensionId);
+    await setHeuristics(page, true);
     const result = await checkUrlLive(page, "https://garanti.com.t/giris");
     expect(["DANGEROUS", "SUSPICIOUS"]).toContain(result.level);
     await page.close();
@@ -42,6 +44,7 @@ test.describe("Phase 3 — Live detection through background SW", () => {
 
   test("Cyrillic homoglyph still flagged via live SW", async ({ context, extensionId }) => {
     const page = await openExtensionContextPage(context, extensionId);
+    await setHeuristics(page, true);
     // Latin 'a' in akbank replaced with Cyrillic 'а' (U+0430).
     // After the short-name distance tightening (#20), this may come
     // through as SUSPICIOUS rather than DANGEROUS — the invariant we
@@ -53,6 +56,7 @@ test.describe("Phase 3 — Live detection through background SW", () => {
 
   test("IP URL flagged via live SW", async ({ context, extensionId }) => {
     const page = await openExtensionContextPage(context, extensionId);
+    await setHeuristics(page, true);
     const result = await checkUrlLive(page, "http://185.34.56.78/login");
     expect(["DANGEROUS", "SUSPICIOUS"]).toContain(result.level);
     await page.close();

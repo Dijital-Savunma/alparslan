@@ -61,6 +61,11 @@ export default function Options() {
     saveSettings(updated);
   };
 
+  const handleHeuristicToggle = () => {
+    const updated = { ...settings, heuristicsEnabled: !settings.heuristicsEnabled }
+    saveSettings(updated)
+  }
+
   const handleAddDomain = () => {
     const domain = normalizeWhitelistInput(newDomain);
     if (!domain || settings.whitelist.includes(domain)) return;
@@ -213,6 +218,70 @@ export default function Options() {
           </div>
         </label>
       </Section>
+
+      {/* DEVELOPER ONLY - hidden heuristic settings */}
+      <div style={{ display: "none" }}>
+        <Section title={t.settings.heuristicsEnabled}>
+          <label
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#f8fafc";
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow = "0 8px 20px rgba(15, 23, 42, 0.08)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "white";
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(15, 23, 42, 0.04)";
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "10px 12px",
+              background: "white",
+              borderRadius: 12,
+              transition: "all 0.18s ease",
+              boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+              border: "1px solid #e5e7eb",
+              cursor: "pointer",
+              marginBottom: 8,
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{t.settings.heuristicsEnabled}</div>
+            </div>
+            {/*After enable heuristic from DevTools, for ease after first enable developer can turn it to disable from UI */}
+            <div
+              onClick={handleHeuristicToggle}
+              style={{
+                width: 44,
+                height: 24,
+                borderRadius: 12,
+                background: settings.heuristicsEnabled ? "#22c55e" : "#d1d5db",
+                position: "relative",
+                transition: "background 0.2s",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  background: "white",
+                  position: "absolute",
+                  top: 2,
+                  left: settings.heuristicsEnabled ? 22 : 2,
+                  transition: "left 0.2s",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                }}
+              />
+            </div>
+          </label>
+        </Section>
+
+      </div>
 
       {/* Network Monitoring */}
       <Section title={t.options.networkMonitoring}>

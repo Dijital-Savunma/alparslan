@@ -194,7 +194,7 @@ describe("Phase 3 — Detection effectiveness", () => {
   describe("True positives — phishing corpus", () => {
     for (const tc of PHISH_CORPUS) {
       it(`${tc.tag} — ${tc.url}`, () => {
-        const result = checkUrl(tc.url, "medium");
+        const result = checkUrl(tc.url, "medium", true);
         const flagged =
           result.level === ThreatLevel.DANGEROUS ||
           result.level === ThreatLevel.SUSPICIOUS;
@@ -234,7 +234,7 @@ describe("Phase 3 — Detection effectiveness", () => {
   describe("False positives — legitimate corpus", () => {
     for (const url of LEGIT_CORPUS) {
       it(`legit: ${url}`, () => {
-        const result = checkUrl(url, "medium");
+        const result = checkUrl(url, "medium", true);
         const flagged =
           result.level === ThreatLevel.DANGEROUS ||
           result.level === ThreatLevel.SUSPICIOUS;

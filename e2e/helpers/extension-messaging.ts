@@ -66,3 +66,12 @@ export async function removeFromWhitelist(
     domain,
   });
 }
+
+export async function setHeuristics(page: Page, enabled: boolean): Promise<void> {
+  await page.evaluate((heuristicsEnabled) => new Promise<void>((resolve) => {
+    chrome.storage.sync.get(["settings"], (r) => {
+      const settings = { ...(r.settings as Record<string, unknown> ?? {}), heuristicsEnabled };
+      chrome.runtime.sendMessage({ type: "SETTINGS_UPDATED", settings }, () => resolve());
+    });
+  }), enabled);
+}

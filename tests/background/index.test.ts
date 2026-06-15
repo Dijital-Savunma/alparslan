@@ -21,8 +21,11 @@ let onInstalledCallback: () => void;
 // Setup chrome mock before importing
 const sendMessageMock = vi.fn().mockResolvedValue(undefined);
 const storageSetMock = vi.fn((_items: unknown, cb?: () => void) => cb?.());
+
+// heuristicsEnabled setted as true for testing environment
 const storageGetMock = vi.fn(
-  (_keys: unknown, cb: (result: Record<string, unknown>) => void) => cb({}),
+  (_keys: unknown, cb: (result: Record<string, unknown>) => void) =>
+    cb({ settings: { heuristicsEnabled: true } }),
 );
 
 const fetchMock = vi.fn().mockResolvedValue({

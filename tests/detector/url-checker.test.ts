@@ -110,57 +110,57 @@ describe("checkUrl", () => {
   });
 
   it("should return UNKNOWN for invalid URL", () => {
-    const result = checkUrl("not-a-url");
+    const result = checkUrl("not-a-url", undefined, true);
     expect(result.level).toBe(ThreatLevel.UNKNOWN);
     expect(result.reasons).toContain(t.reasons.invalidUrl);
   });
 
   it("should return SAFE for trusted domains", () => {
-    const result = checkUrl("https://turkiye.gov.tr/login");
+    const result = checkUrl("https://turkiye.gov.tr/login", undefined, true);
     expect(result.level).toBe(ThreatLevel.SAFE);
     expect(result.score).toBe(0);
   });
 
   it("should return DANGEROUS for blocklisted domains", async () => {
     await addToBlacklist([{ domain: "evil-phishing.com", category: "other", addedAt: "2026-01-01", source: "manual" }]);
-    const result = checkUrl("https://evil-phishing.com/login");
+    const result = checkUrl("https://evil-phishing.com/login", undefined, true);
     expect(result.level).toBe(ThreatLevel.DANGEROUS);
     expect(result.score).toBe(100);
   });
 
   it("should detect typosquatting as DANGEROUS", () => {
-    const result = checkUrl("https://isbenk.com.tr/login");
+    const result = checkUrl("https://isbenk.com.tr/login", undefined, true);
     expect(result.level).toBe(ThreatLevel.DANGEROUS);
     expect(result.score).toBeGreaterThanOrEqual(70);
   });
 
   it("should flag IP-based URLs as SUSPICIOUS", () => {
-    const result = checkUrl("http://192.168.1.1/phishing");
+    const result = checkUrl("http://192.168.1.1/phishing", undefined, true);
     expect(result.score).toBeGreaterThanOrEqual(30);
   });
 
   describe("excessive subdomain threshold (> 3 labels)", () => {
     it("3 subdomain labels — must NOT trigger excessive-subdomain warning", () => {
       // a.b.c  → canonical.subdomain = "a.b.c" → 3 labels, threshold is > 3 → no flag
-      const result = checkUrl("https://a.b.c.example.com");
+      const result = checkUrl("https://a.b.c.example.com", undefined, true);
       expect(result.reasons.some((r) => r.includes("alt alan"))).toBe(false);
       expect(result.level).not.toBe(ThreatLevel.SUSPICIOUS);
     });
 
     it("4 subdomain labels — must trigger excessive-subdomain warning", () => {
       // a.b.c.d → canonical.subdomain = "a.b.c.d" → 4 labels, threshold is > 3 → flag
-      const result = checkUrl("https://a.b.c.d.example.com");
+      const result = checkUrl("https://a.b.c.d.example.com", undefined, true);
       expect(result.reasons.some((r) => r.includes("alt alan"))).toBe(true);
     });
 
     it("5+ subdomain labels — also triggers (existing smoke test)", () => {
-      const result = checkUrl("https://a.b.c.d.e.example.com");
+      const result = checkUrl("https://a.b.c.d.e.example.com", undefined, true);
       expect(result.reasons.some((r) => r.includes("alt alan"))).toBe(true);
     });
   });
 
   it("should flag suspicious keywords in domain", () => {
-    const result = checkUrl("https://secure-login-verify.xyz");
+    const result = checkUrl("https://secure-login-verify.xyz", undefined, true);
     expect(result.reasons.some((r) => r.includes("anahtar kelime"))).toBe(true);
   });
 
@@ -186,7 +186,7 @@ describe("checkUrl", () => {
   ])(
     "should flag regression corpus phishing URL %s",
     (url, level, score, reasonFragment) => {
-      const result = checkUrl(url);
+      const result = checkUrl(url, undefined, true);
 
       expect(result.level).toBe(level);
       expect(result.score).toBeGreaterThanOrEqual(score);
@@ -196,12 +196,12 @@ describe("checkUrl", () => {
 
   it("should include timestamp in result", () => {
     const before = Date.now();
-    const result = checkUrl("https://example.com");
+    const result = checkUrl("https://example.com", undefined, true);
     expect(result.checkedAt).toBeGreaterThanOrEqual(before);
   });
 
   it("should return UNKNOWN for unknown but not suspicious domains", () => {
-    const result = checkUrl("https://some-random-site.org");
+    const result = checkUrl("https://some-random-site.org", undefined, true);
     expect(result.level).toBe(ThreatLevel.UNKNOWN);
     expect(result.score).toBe(0);
   });
@@ -210,30 +210,30 @@ describe("checkUrl", () => {
     it("low: should only check blocklist", async () => {
       await addToBlacklist([{ domain: "evil.com", category: "other", addedAt: "2026-01-01", source: "manual" }]);
       // Blocklist still works
-      const blocked = checkUrl("https://evil.com", "low");
+      const blocked = checkUrl("https://evil.com", "low", true);
       expect(blocked.level).toBe(ThreatLevel.DANGEROUS);
 
       // Typosquatting NOT detected in low mode
-      const typo = checkUrl("https://isbenk.com.tr/login", "low");
+      const typo = checkUrl("https://isbenk.com.tr/login", "low", true);
       expect(typo.level).not.toBe(ThreatLevel.DANGEROUS);
       expect(typo.score).toBe(0);
     });
 
     it("low: should return SAFE for trusted domains", () => {
-      const result = checkUrl("https://turkiye.gov.tr", "low");
+      const result = checkUrl("https://turkiye.gov.tr", "low", true);
       expect(result.level).toBe(ThreatLevel.SAFE);
     });
 
     it("medium: should detect typosquatting and keywords", () => {
-      const result = checkUrl("https://isbenk.com.tr", "medium");
+      const result = checkUrl("https://isbenk.com.tr", "medium", true);
       expect(result.level).toBe(ThreatLevel.DANGEROUS);
       expect(result.score).toBeGreaterThanOrEqual(70);
     });
 
     it("high: should use lower thresholds", () => {
       // Keywords alone: score 20, medium threshold 30 = UNKNOWN, high threshold 15 = SUSPICIOUS
-      const medKeyword = checkUrl("https://secure-login.xyz", "medium");
-      const highKeyword = checkUrl("https://secure-login.xyz", "high");
+      const medKeyword = checkUrl("https://secure-login.xyz", "medium", true);
+      const highKeyword = checkUrl("https://secure-login.xyz", "high", true);
       expect(medKeyword.level).toBe(ThreatLevel.UNKNOWN);
       expect(highKeyword.level).toBe(ThreatLevel.SUSPICIOUS);
     });
