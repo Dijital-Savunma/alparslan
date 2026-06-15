@@ -224,7 +224,7 @@ const tr = {
     // didn't scan it, they vouched for it, so we acknowledge that instead of
     // claiming we scanned it. Keep the "iyi gezintiler" keyword: StatusPanel
     // bolds it as the highlight word.
-    whitelisted: (domain: string) => `${domain} sitesini güvendiğiniz bağlantılara eklediniz. Burada Alparslan koruması esnetildi, iyi gezintiler!`,
+    whitelisted: (domain: string) => `${domain} sitesini güvendiğiniz bağlantılara eklediniz, iyi gezintiler!`,
     // Aksiyon paneli — risk taşıyan durumlarda balonun altında çıkar.
     actionPrompt: "Dilerseniz güvenliğiniz için aşağıdaki adımlardan birini seçebilirsiniz:",
     actionClose: "Sayfadan Ayrıl",
