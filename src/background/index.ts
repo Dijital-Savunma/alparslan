@@ -202,16 +202,34 @@ async function initServiceWorker(): Promise<void> {
   // OWN progress the moment it settles — so the bar climbs 40→60→80→100
   // smoothly instead of jumping straight from 40 to 100 when all three finish
   // together.
+  //
+  // Per-step timeout (5 sn): safe-fetch'in 30 sn default'u bir adımı bloklarsa
+  // SW init donardı; kullanici "Güvendiğim bağlantılar yükleniyor"da 30 sn
+  // bekliyordu. Timeout doldugunda adımı "tamamlandı" sayıyoruz — gercek
+  // fetch arka planda tamamlanmaya devam ediyor, sadece UI bekletmiyor.
+  const STEP_BUDGET_MS = 5000;
+  function withStepTimeout<T>(p: Promise<T>, label: string): Promise<T | void> {
+    return Promise.race([
+      p,
+      new Promise<void>((resolve) =>
+        setTimeout(() => {
+          logger.warn(`${label} exceeded ${STEP_BUDGET_MS}ms budget — letting SW init continue, finish in background`);
+          resolve();
+        }, STEP_BUDGET_MS),
+      ),
+    ]);
+  }
+
   initProgress.step = t.init.usom + " " + t.init.loadingSuffix;
   const t2 = Date.now();
 
-  const usomP = initUsomBlocklist()
+  const usomP = withStepTimeout(initUsomBlocklist(), "USOM init")
     .catch((e) => logger.warn("USOM init failed:", e))
     .finally(() => updateProgress(2, Date.now() - t2));
-  const wlP = initWhitelist()
+  const wlP = withStepTimeout(initWhitelist(), "Whitelist init")
     .catch((e) => logger.warn("Whitelist init failed:", e))
     .finally(() => updateProgress(3, Date.now() - t2));
-  const breachP = initBreachCache()
+  const breachP = withStepTimeout(initBreachCache(), "Breach init")
     .catch((e) => logger.warn("Breach init failed:", e))
     .finally(() => updateProgress(4, Date.now() - t2));
 
