@@ -4,15 +4,6 @@ import { normalizeWhitelistInput } from "@/utils/whitelist-normalize";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import t from "@/i18n/tr";
 
-type ProtectionLevel = ExtensionSettings["protectionLevel"];
-
-const PROTECTION_LABELS: Record<ProtectionLevel, { label: string; desc: string }> = {
-  low: { label: t.protection.low, desc: t.protection.lowDesc },
-  medium: { label: t.protection.medium, desc: t.protection.mediumDesc },
-  high: { label: t.protection.high, desc: t.protection.highDesc },
-};
-
-
 export default function Options() {
   const [settings, setSettings] = useState<ExtensionSettings>(DEFAULT_SETTINGS);
   const [newDomain, setNewDomain] = useState("");
@@ -20,7 +11,6 @@ export default function Options() {
   const [cleared, setCleared] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDisableNotif, setShowDisableNotif] = useState(false);
-
   useEffect(() => {
     chrome.storage.sync.get(["settings"], (result) => {
       if (result.settings) {
@@ -38,10 +28,6 @@ export default function Options() {
     });
   }, []);
 
-  const handleProtectionChange = (level: ProtectionLevel) => {
-    saveSettings({ ...settings, protectionLevel: level });
-  };
-
   // Mirrors the popup "Tehlike Uyarıları" toggle: both control `showDomWarnings`
   // so flipping one reflects in the other. Turning it OFF asks for confirmation.
   const handleNotificationsToggle = () => {
@@ -50,15 +36,6 @@ export default function Options() {
     } else {
       saveSettings({ ...settings, showDomWarnings: true }); // currently OFF → enable
     }
-  };
-
-  const handleNetworkMonitoringToggle = () => {
-    const updated = { ...settings, networkMonitoringEnabled: !settings.networkMonitoringEnabled };
-    // If disabling monitoring, also disable blocking
-    if (!updated.networkMonitoringEnabled) {
-      updated.networkBlockingEnabled = false;
-    }
-    saveSettings(updated);
   };
 
   const handleAddDomain = () => {
@@ -92,7 +69,7 @@ export default function Options() {
     <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
-        <span style={{ fontSize: 28 }}>{"\uD83D\uDEE1\uFE0F"}</span>
+        <span style={{ fontSize: 28 }}>{"\u2699\uFE0F"}</span>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, color: "#1e293b" }}>{t.options.title}</h1>
           <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
@@ -117,166 +94,14 @@ export default function Options() {
         </div>
       )}
 
-      {/* Protection Level */}
-      <Section title={t.options.protectionLevel}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {(Object.keys(PROTECTION_LABELS) as ProtectionLevel[]).map((level) => (
-            <label
-              key={level}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-                padding: "10px 12px",
-                border: `2px solid ${settings.protectionLevel === level ? "#3b82f6" : "#e5e7eb"}`,
-                borderRadius: 8,
-                cursor: "pointer",
-                background: settings.protectionLevel === level ? "#eff6ff" : "white",
-              }}
-            >
-              <input
-                type="radio"
-                name="protection"
-                checked={settings.protectionLevel === level}
-                onChange={() => handleProtectionChange(level)}
-                style={{ marginTop: 2 }}
-              />
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{PROTECTION_LABELS[level].label}</div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                  {PROTECTION_LABELS[level].desc}
-                </div>
-              </div>
-            </label>
-          ))}
-        </div>
-      </Section>
-
       {/* Notifications */}
       <Section title={t.options.notifications}>
-        <label
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#f8fafc";
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.boxShadow = "0 8px 20px rgba(15, 23, 42, 0.08)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "white";
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.boxShadow = "0 2px 8px rgba(15, 23, 42, 0.04)";
-          }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 12px",
-            background: "white",
-            borderRadius: 12,
-            transition: "all 0.18s ease",
-            boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
-            border: "1px solid #e5e7eb",
-            cursor: "pointer",
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{t.settings.dangerWarnings}</div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-              {t.settings.dangerWarningsDesc}
-            </div>
-          </div>
-          <div
-            onClick={handleNotificationsToggle}
-            style={{
-              width: 44,
-              height: 24,
-              borderRadius: 12,
-              background: settings.showDomWarnings !== false ? "#22c55e" : "#d1d5db",
-              position: "relative",
-              transition: "background 0.2s",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: 10,
-                background: "white",
-                position: "absolute",
-                top: 2,
-                left: settings.showDomWarnings !== false ? 22 : 2,
-                transition: "left 0.2s",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-              }}
-            />
-          </div>
-        </label>
-      </Section>
-
-      {/* Network Monitoring */}
-      <Section title={t.options.networkMonitoring}>
-        <label
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#f8fafc";
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.boxShadow = "0 8px 20px rgba(15, 23, 42, 0.08)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "white";
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.boxShadow = "0 2px 8px rgba(15, 23, 42, 0.04)";
-          }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 12px",
-            background: "white",
-            borderRadius: 12,
-            transition: "all 0.18s ease",
-            boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
-            border: "1px solid #e5e7eb",
-            cursor: "pointer",
-            marginBottom: 8,
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{t.settings.networkMonitoring}</div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-              {t.settings.networkMonitoringDesc}
-            </div>
-          </div>
-          <div
-            onClick={handleNetworkMonitoringToggle}
-            style={{
-              width: 44,
-              height: 24,
-              borderRadius: 12,
-              background: settings.networkMonitoringEnabled ? "#22c55e" : "#d1d5db",
-              position: "relative",
-              transition: "background 0.2s",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: 10,
-                background: "white",
-                position: "absolute",
-                top: 2,
-                left: settings.networkMonitoringEnabled ? 22 : 2,
-                transition: "left 0.2s",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-              }}
-            />
-          </div>
-        </label>
-
-        {/* Engelleme ozelligi gecici olarak pasif */}
+        <OptionsSettingCard
+          title={t.settings.dangerWarnings}
+          desc={t.settings.dangerWarningsDesc}
+          enabled={settings.showDomWarnings !== false}
+          onToggle={handleNotificationsToggle}
+        />
       </Section>
 
       {/* Whitelist */}
@@ -466,16 +291,28 @@ export default function Options() {
               saveSettings({ ...settings, showDomWarnings: false });
               setShowDisableNotif(false);
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#f8fafc";
+              e.currentTarget.style.borderColor = "#94a3b8";
+              e.currentTarget.style.transform = "scale(1.02)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.borderColor = "#cbd5e1";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
             style={{
               width: "100%",
-              padding: "6px 0",
-              background: "none",
-              border: "none",
-              color: "#9ca3af",
-              fontSize: 12,
-              fontWeight: 500,
+              padding: "10px 0",
+              background: "transparent",
+              border: "1px solid #cbd5e1",
+              borderRadius: 10,
+              color: "#6b7280",
+              fontSize: 12.5,
+              fontWeight: 600,
               cursor: "pointer",
               fontFamily: "inherit",
+              transition: "background 0.15s ease, border-color 0.15s ease, transform 0.15s ease",
             }}
           >
             {t.confirmDisableNotif.disable}
@@ -490,24 +327,11 @@ export default function Options() {
           title={t.confirmClearData.message}
           body={t.confirmClearData.detail}
         >
+          {/* Sol = aksiyon (kullanici 'Tum Verileri Temizle' butonuna bilerek
+              bastigi icin niyetlenen eylem buradadir — kirmizi dolgu net),
+              sag = guvenli iptal (gri, kayitlari tutar). Goz okuma sonunda
+              sagda durur; isteyen aksiyona sol-tarafa bilincli yonelir. */}
           <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={() => setShowClearConfirm(false)}
-              style={{
-                flex: 1,
-                padding: "10px 0",
-                background: "#f3f4f6",
-                border: "1px solid #e5e7eb",
-                borderRadius: 8,
-                color: "#374151",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              {t.confirmClearData.cancel}
-            </button>
             <button
               onClick={() => {
                 handleClearData();
@@ -528,10 +352,129 @@ export default function Options() {
             >
               {t.confirmClearData.confirm}
             </button>
+            <button
+              onClick={() => setShowClearConfirm(false)}
+              style={{
+                flex: 1,
+                padding: "10px 0",
+                background: "#f3f4f6",
+                border: "1px solid #e5e7eb",
+                borderRadius: 8,
+                color: "#374151",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {t.confirmClearData.cancel}
+            </button>
           </div>
         </ConfirmModal>
       )}
+
     </div>
+  );
+}
+
+/**
+ * Options sayfasinda ayar karti — kartin tamamı tıklanabilir (sadece
+ * toggle değil), toggle'ın etrafında popup ile aynı hover halka
+ * efekti (boxShadow + scale). Kullanıcı refleksle herhangi bir yere
+ * basabilsin diye yapıldı, popup SettingCard ile UX paritesi sağlıyor.
+ *
+ * Inline stil — Options sayfasında popup theme.ts CSS class'ları
+ * yüklü değil, o yüzden mouseEnter/Leave ile elle yönetiliyor.
+ */
+function OptionsSettingCard({
+  title,
+  desc,
+  enabled,
+  onToggle,
+}: {
+  title: string;
+  desc: string;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-label={`${title}: ${enabled ? "ayar aktif" : "ayar kapali"}`}
+      onClick={onToggle}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "#f8fafc";
+        e.currentTarget.style.transform = "translateY(-1px)";
+        e.currentTarget.style.boxShadow = "0 8px 20px rgba(15, 23, 42, 0.08)";
+        const knob = e.currentTarget.querySelector<HTMLDivElement>("[data-toggle-knob]");
+        if (knob) {
+          knob.style.transform = "scale(1.08)";
+          knob.style.boxShadow = enabled
+            ? "0 0 0 4px rgba(34, 197, 94, 0.18), 0 3px 8px rgba(34, 197, 94, 0.25)"
+            : "0 0 0 4px rgba(148, 163, 184, 0.20), 0 3px 8px rgba(15, 23, 42, 0.15)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "white";
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 2px 8px rgba(15, 23, 42, 0.04)";
+        const knob = e.currentTarget.querySelector<HTMLDivElement>("[data-toggle-knob]");
+        if (knob) {
+          knob.style.transform = "scale(1)";
+          knob.style.boxShadow = "none";
+        }
+      }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 12px",
+        background: "white",
+        borderRadius: 12,
+        transition: "all 0.18s ease",
+        boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+        border: "1px solid #e5e7eb",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%",
+        color: "#1f2937",
+        marginBottom: 8,
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: 600, fontSize: 14, color: "#1f2937" }}>{title}</div>
+        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{desc}</div>
+      </div>
+      <div
+        data-toggle-knob
+        style={{
+          width: 44,
+          height: 24,
+          borderRadius: 12,
+          background: enabled ? "#22c55e" : "#d1d5db",
+          position: "relative",
+          flexShrink: 0,
+          transition: "background 0.2s, transform 0.18s ease, box-shadow 0.18s ease",
+        }}
+      >
+        <div
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 10,
+            background: "white",
+            position: "absolute",
+            top: 2,
+            left: enabled ? 22 : 2,
+            transition: "left 0.2s",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+          }}
+        />
+      </div>
+    </button>
   );
 }
 

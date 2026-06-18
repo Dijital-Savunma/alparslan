@@ -9,21 +9,9 @@ test.describe("Options Page — Happy Path", () => {
     await options.close();
   });
 
-  test("should show protection level settings", async ({ context, extensionId }) => {
-    const options = await openOptionsPage(context, extensionId);
-    await expect(options.getByText("Koruma Seviyesi")).toBeVisible();
-    await expect(options.getByText("Düşük")).toBeVisible();
-    await expect(options.getByText("Orta")).toBeVisible();
-    await expect(options.getByText("Yüksek")).toBeVisible();
-    await options.close();
-  });
-
-  test("should allow changing protection level", async ({ context, extensionId }) => {
-    const options = await openOptionsPage(context, extensionId);
-    await options.getByText("Yüksek").click();
-    await expect(options.getByText("Ayarlar kaydedildi")).toBeVisible({ timeout: 3000 });
-    await options.close();
-  });
+  // NOT: "Koruma Seviyesi" UI bolumu kaldirildi (low/medium/high secimi
+  // gerek gormedik). protectionLevel ayari arka planda hala mevcut ve
+  // detection threshold'lari icin kullaniliyor, sadece UI cikti.
 
   test("should allow adding to whitelist", async ({ context, extensionId }) => {
     const options = await openOptionsPage(context, extensionId);
@@ -77,7 +65,9 @@ test.describe("Options Page — Negative Scenarios", () => {
     await options.getByText("Tüm Verileri Temizle").click();
     await options.getByRole("button", { name: "Evet, Hepsini Temizle" }).click();
     await expect(options.getByText("Veriler temizlendi")).toBeVisible({ timeout: 5000 });
-    await expect(options.getByText("Koruma Seviyesi")).toBeVisible();
+    // Sayfa hala duruyor — temizleme sonrasi baska section'da bir baslik
+    // var oldugundan emin olalim (Tehlike Uyarilari toggle bolumu).
+    await expect(options.getByText("Bildirimler")).toBeVisible();
     await options.close();
   });
 });
