@@ -13,8 +13,11 @@ test.describe("Popup Navigation", () => {
 
   test("should show Durum and Skor tabs", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
-    await expect(popup.getByText("Durum")).toBeVisible();
-    await expect(popup.getByText("Skor")).toBeVisible();
+    // `.first()` — "Durum"/"Skor" speech-bubble copy de bu kelimeleri
+    // tasiyor; strict-mode'da multiple-match'i kacinmak icin tab bar'da
+    // gozuken ilk insanca okunabilen olusumu hedefliyoruz.
+    await expect(popup.getByText("Durum").first()).toBeVisible();
+    await expect(popup.getByText("Skor").first()).toBeVisible();
     await popup.close();
   });
 

@@ -35,8 +35,10 @@ test.describe("Popup — Notification Centre", () => {
   test("cumulative summary shows in notification panel", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByTitle("Bildirimleri görüntüle").click();
-    // Welcome line + cumulative summary should both render
-    await expect(popup.getByText(/Şu ana kadar sizin için/)).toBeVisible();
+    // Welcome line + cumulative summary (passive-voice lines with emoji prefixes)
+    // should both render. The "Şu ana kadar sizin için" prefix was dropped;
+    // we now match on the suffix of each summary line instead.
+    await expect(popup.getByText(/adres kontrol edildi/)).toBeVisible();
     await expect(popup.getByText(/gündür korunuyorsunuz/)).toBeVisible();
     await popup.close();
   });
