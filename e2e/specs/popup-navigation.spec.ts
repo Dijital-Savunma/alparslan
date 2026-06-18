@@ -20,10 +20,10 @@ test.describe("Popup Navigation", () => {
 
   test("should default to Durum tab with stat cards visible", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
-    // Refactor sonrasi Durum sekmesindeki sayac kartlari yeniden adlandirildi:
-    // "Kontrol" -> "Tarama Geçmişi", "Tehdit" -> "Engellenen Tehdit".
-    await expect(popup.getByText("Tarama Geçmişi")).toBeVisible();
-    await expect(popup.getByText("Engellenen Tehdit")).toBeVisible();
+    // Durum sekmesindeki sayac kartlari: "Kontrol Geçmişi", "Tehlikeli Adresler",
+    // "Şüpheli Durumlar". Iki orta kart varligini test ediyor.
+    await expect(popup.getByText("Kontrol Geçmişi")).toBeVisible();
+    await expect(popup.getByText("Tehlikeli Adresler")).toBeVisible();
     await popup.close();
   });
 
@@ -43,7 +43,7 @@ test.describe("Popup Navigation", () => {
     // gecebilir (ornegin balon metni).
     await popup.getByText("Durum").first().click();
     // Sayac karti acik; .first() ile strict mode'dan kacin.
-    await expect(popup.getByText("Tarama Geçmişi").first()).toBeVisible({ timeout: 5000 });
+    await expect(popup.getByText("Kontrol Geçmişi").first()).toBeVisible({ timeout: 5000 });
     await popup.close();
   });
 

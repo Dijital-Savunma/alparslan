@@ -84,20 +84,20 @@ test.describe("Popup — Settings tab whitelist management", () => {
 });
 
 test.describe("Popup — Durum sekmesindeki sayac kartlari", () => {
-  test("3 sayac karti gorunur (Tarama Geçmişi, Engellenen Tehdit, Potansiyel Risk)", async ({
+  test("3 sayac karti gorunur (Kontrol Geçmişi, Tehlikeli Adresler, Şüpheli Durumlar)", async ({
     context,
     extensionId,
   }) => {
     const popup = await openPopup(context, extensionId);
-    // Refactor sonrasi 4-stat satiri (Kontrol/Tehdit/Tracker/Bilinmeyen) yerine
-    // 3 SkorCountButton karti var.
-    await expect(popup.getByText("Tarama Geçmişi")).toBeVisible();
-    await expect(popup.getByText("Engellenen Tehdit")).toBeVisible();
-    await expect(popup.getByText("Potansiyel Risk")).toBeVisible();
+    // 3 SkorCountButton karti — Kontrol Geçmişi + Tehlikeli Adresler + Şüpheli
+    // Durumlar (refactor sonrasi 4-stat satirinin yerine geldi).
+    await expect(popup.getByText("Kontrol Geçmişi")).toBeVisible();
+    await expect(popup.getByText("Tehlikeli Adresler")).toBeVisible();
+    await expect(popup.getByText("Şüpheli Durumlar")).toBeVisible();
     await popup.close();
   });
 
-  // NOT: "Engellenen Tehdit kartina tıklayinca liste basligi gorunur" testi
+  // NOT: "Tehlikeli Adresler kartina tıklayinca liste basligi gorunur" testi
   // silindi — popup React state guncellemesi + conditional render zinciri
   // Playwright extension fixture'inda guvenilir tetiklenmiyordu. Kart
   // varligi yukarıdaki "3 sayac karti gorunur" testi ile zaten dogrulaniyor;

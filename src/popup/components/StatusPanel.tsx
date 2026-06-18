@@ -1,8 +1,28 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { type ExtensionSettings } from "@/utils/types";
 import t from "@/i18n/tr";
 import { narrateReason } from "../narrateReason";
 import { type SecurityStatus } from "../App";
+
+/**
+ * "Kontrol ediliyor" satirinda animasyonlu nokta sayisi (0→1→2→3→0...)
+ * dondurur. Sadece displayStatus === "loading" iken interval kurulur, baska
+ * durumda hemen "" kalır. Boylece kullanici "ekran dondu mu" diye dusunmez.
+ */
+function useLoadingDots(active: boolean): string {
+  const [dots, setDots] = useState("");
+  useEffect(() => {
+    if (!active) {
+      setDots("");
+      return;
+    }
+    const id = window.setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 400);
+    return () => window.clearInterval(id);
+  }, [active]);
+  return dots;
+}
 
 /**
  * Popup Durum sekmesindeki ana status panosu. Iki sunum modu var:
@@ -31,7 +51,6 @@ export function StatusPanel({
   isWhitelisted,
   popupWhitelistInput,
   setPopupWhitelistInput,
-  handleAddToWhitelist,
   setShowCloseConfirm,
   setShowTrustConfirm,
   enabled,
@@ -47,7 +66,6 @@ export function StatusPanel({
    *  geliyor, ileride autofill chip burada kullanilirsa diye prop'ta tutuldu. */
   popupWhitelistInput: string;
   setPopupWhitelistInput: (v: string) => void;
-  handleAddToWhitelist: () => void;
   setShowCloseConfirm: (v: boolean) => void;
   setShowTrustConfirm: (v: boolean) => void;
   enabled: boolean;
@@ -56,6 +74,9 @@ export function StatusPanel({
   // doğrudan kullanılacaklar.
   void popupWhitelistInput;
   void setPopupWhitelistInput;
+  // Loading durumunda "Kontrol ediliyor" yazisina animasyonlu nokta katarak
+  // arayuzun donmadigini gostermek icin (sadece loading'de aktif).
+  const loadingDots = useLoadingDots(displayStatus === "loading");
   return (
       <div
         style={{
@@ -112,10 +133,10 @@ export function StatusPanel({
           // verdict in one glance without making the whole bubble loud.
           const highlightWord =
             whitelisted ? "iyi gezintiler" :
-            displayStatus === "safe" ? "güvendesiniz" :
-            displayStatus === "dangerous" ? "uzaklaşın" :
+            displayStatus === "safe" ? "temiz görünüyor" :
+            displayStatus === "dangerous" ? "hemen kapatın" :
             displayStatus === "suspicious" ? "dikkatli olun" :
-            "merak etmeyin";
+            "tedbirli olun";
           const accentColor =
             displayStatus === "safe" ? "#16a34a" :
             displayStatus === "dangerous" ? "#dc2626" :
@@ -381,7 +402,10 @@ export function StatusPanel({
           <div style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
             <span
               style={{
-                animation: displayStatus === "safe" && enabled ? "safePulse 1.6s ease-out infinite" : "none",
+                animation:
+                  displayStatus === "loading" ? "loadingPulse 1.1s ease-in-out infinite" :
+                  displayStatus === "safe" && enabled ? "safePulse 1.6s ease-out infinite" :
+                  "none",
                 boxShadow: displayStatus === "safe" && enabled ? "0 0 0 0 rgba(22, 163, 74, 0.45)" : "none",
                 width: 10,
                 height: 10,
@@ -407,7 +431,9 @@ export function StatusPanel({
               style={{ display: "flex", flexDirection: "column", justifyContent: "center", minWidth: 0 }}
             >
               <div style={{ fontWeight: 700, fontSize: 16, color: config?.color || "#374151" }}>
-                {displayStatus === "loading" ? t.status.checking : config?.label}
+                {displayStatus === "loading"
+                  ? <>{t.status.checking.replace(/\.+$/, "")}{loadingDots}</>
+                  : config?.label}
               </div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{displayDomain}</div>
             </div>
@@ -420,7 +446,12 @@ export function StatusPanel({
             {displayStatus !== "loading" && !isWhitelisted && displayDomain && displayDomain !== "\u2014" &&
               (displayStatus === "dangerous" || displayStatus === "suspicious" || displayStatus === "unknown") && (
               <button
-                onClick={handleAddToWhitelist}
+                // Asistan modundaki "Bu Adrese Güven" akisi ile bire bir ayni:
+                // direkt whitelist'e eklemek yerine once onay modali aciliyor —
+                // ikisinin davranisi farkli olursa kullanici hangi yolla
+                // gectigine gore sonuc baska olur, kafa karistirici.
+                // Modal asistan modundan bagimsiz; klasik gorunumde bile cikar.
+                onClick={() => setShowTrustConfirm(true)}
                 title={t.popupWhitelist.tooltipAdd}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "#dbeafe";

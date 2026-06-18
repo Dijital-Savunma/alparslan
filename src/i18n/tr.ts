@@ -135,18 +135,28 @@ const tr = {
 
   // --- Tehlike uyarilarini kapatma onayi (popup) ---
   confirmDisableNotif: {
-    message: "Bildirimleri kapatmak istediğinizden emin misiniz?",
-    detail: "Kapatırsanız, Alparslan sizi arka plandaki gizli tehlikelere karşı uyarmayı durdurur.",
+    message: "🔔 Bildirimleri kapatmak istediğinizden emin misiniz?",
+    detail: "Kapatırsanız, Alparslan tespit ettiği tehlikeli veya şüpheli adresleri size anlık uyarı olarak göstermeyi durdurur.",
     keep: "Hayır, Korumaya Devam Et",
     disable: "Evet, Bildirimleri Kapat",
   },
 
   // --- Tum verileri temizleme onayi (options) ---
   confirmClearData: {
-    message: "Tüm geçmişi ve verileri temizlemek istiyor musunuz?",
-    detail: "Bu işlem geri alınamaz. Alparslan'ın bugüne kadar sizi koruduğu tüm tarama kayıtları ve istatistikler tamamen silinecektir.",
+    message: "⚠️ Tüm geçmişi ve verileri temizlemek istiyor musunuz?",
+    detail: "Bu işlem geri alınamaz. Alparslan'ın bugüne kadar kontrol ettiği tüm adres verileri ve istatistikler tamamen silinecektir.",
     cancel: "Vazgeç, Kayıtları Tut",
     confirm: "Evet, Hepsini Temizle",
+  },
+
+  // --- Detayli Guvenlik Taramasi kapatma onayi (options) ---
+  // Tehlike Uyarilari modeli ile ayni: kullanici kapatmadan once net
+  // bir karsi-niyet onayi alir, refleksle kapatmasin.
+  confirmDisableNetworkMonitoring: {
+    message: "🔍 Detaylı Güvenlik Taramasını kapatmak istediğinizden emin misiniz?",
+    detail: "Kapatırsanız, Alparslan sitelerin arkasında gizlenmiş takipçi ve tehdit isteklerini izlemeyi durdurur. Adres seviyesindeki temel korumanız çalışmaya devam eder.",
+    keep: "Hayır, Tarama Açık Kalsın",
+    disable: "Evet, Taramayı Kapat",
   },
 
   // --- Popup ag izleme ---
@@ -161,11 +171,11 @@ const tr = {
   // --- Popup gecmis ---
   history: {
     hide: "Geçmişi gizle",
-    hideList: "Tarama geçmişini gizle",
-    show: "Tarama geçmişi",
-    empty: "Henüz tarama yok",
+    hideList: "Kontrol geçmişini gizle",
+    show: "Kontrol geçmişi",
+    empty: "Henüz kontrol yok",
     clear: "Geçmişi temizle",
-    showAlt: "Tarama geçmişini görüntüle",
+    showAlt: "Kontrol geçmişini görüntüle",
     hideAlt: "Geçmiş listesini gizle",
   },
 
@@ -173,10 +183,10 @@ const tr = {
   filterLists: {
     // Skor sekmesindeki acilabilir listelerin baslik metinleri.
     controlList: "Kontrol Listesi",
-    threatList: "Tehdit Listesi",
-    unknownList: "Risk Listesi",
-    threatEmpty: "Tehdit bulunamadı",
-    unknownEmpty: "Şüpheli kayıt bulunamadı",
+    threatList: "Tehlikeli Adres Listesi",
+    unknownList: "Şüpheli Durum Listesi",
+    threatEmpty: "Tehlikeli adres bulunamadı",
+    unknownEmpty: "Şüpheli durum bulunamadı",
   },
 
   // --- Popup "guvendigim baglantilar" hizli ekleme ---
@@ -216,10 +226,10 @@ const tr = {
     // Body of the verdict line — the leading status emoji is rendered as a
     // separate element in the popup so subsequent wrapped lines align with
     // the first character of text instead of the bubble's edge.
-    safe: (domain: string) => `${domain} sayfasını sizin için baştan aşağı taradım. Her şey sapasağlam, Alparslan ile güvendesiniz!`,
-    suspicious: (domain: string) => `${domain} sayfasında şüpheli hareketler seziyorum. Bilgilerinizi veya şifrelerinizi girerken dikkatli olun!`,
-    dangerous: (domain: string) => `Durun! ${domain} sayfasında dijital tuzaklar ve zararlı yazılımlar var. Güvenliğiniz için bu sayfadan hemen uzaklaşın!`,
-    unknown: (domain: string) => `${domain} sayfasını ilk defa görüyorum. Kalkanlarım şu an arka planda sayfayı incelemeye devam ediyor, merak etmeyin.`,
+    safe: (domain: string) => `${domain} sayfası Alparslan tarafından güvenli bulundu. Her şey tamamen temiz görünüyor, iyi gezintiler!`,
+    suspicious: (domain: string) => `${domain} sayfasında bazı şüpheli durumlar seziyorum. Sizi yanıltmaya çalışıyor olabilirler. Şifrelerinizi girerken çok dikkatli olun! ⚠️`,
+    dangerous: (domain: string) => `Durun! ${domain} adresinin sahte ve tehlikeli bir tuzak olduğu tespit edildi. Güvenliğiniz için bu sayfayı hemen kapatın! 🛑`,
+    unknown: (domain: string) => `${domain} sayfasını ilk defa görüyorum. Bilinen bir tehdit kaydı bulunamadı ancak siz yine de işlemlerinizi yaparken tedbirli olun.`,
     // Shown when the SAFE verdict comes from the user's own whitelist — we
     // didn't scan it, they vouched for it, so we acknowledge that instead of
     // claiming we scanned it. Keep the "iyi gezintiler" keyword: StatusPanel
@@ -233,16 +243,20 @@ const tr = {
     // İki aksiyon için onay pencereleri.
     // "Bu Adrese Güven" onayı — kullanıcı koruma kalkanlarını indiriyor.
     confirmTrustTitle: "⚠️ Bu adresi güvenli listeye eklemek üzeresiniz.",
+    // Decoratif emoji'leri (🚪 / 👍 / ❌) cikardik: 🚪 sekme kapatmayi gercek
+    // bir "kapidan cikis"a baglayip emlak sitesi havasi veriyordu, 👍 tehlikeli
+    // bir aksiyonu odul gibi gostererek kullaniciyi yanlis yone cekiyordu.
+    // Sadece baslikta "uyari" anlami tasiyan ⚠️ kaldi.
     confirmTrustBody:
       "Onaylarsanız Alparslan bu sayfa için koruma kalkanlarını indirecek ve sitenin tüm hareketlerine izin verecektir. Riski kabul ediyor musunuz?",
-    confirmTrustCancel: "❌ Vazgeç",
-    confirmTrustConfirm: "👍 Evet, Güven",
+    confirmTrustCancel: "Vazgeç",
+    confirmTrustConfirm: "Evet, Güven",
     // "Sayfadan Ayrıl" onayı — kullanıcı tehlikeli sekmeyi kapatıyor.
-    confirmCloseTitle: "🚪 Bu sayfayı kapatmak istediğinizden emin misiniz?",
+    confirmCloseTitle: "Bu sayfayı kapatmak istediğinizden emin misiniz?",
     confirmCloseBody:
       "Onayladığınız an Alparslan bu tehlikeli sekmeyi tamamen sonlandıracaktır. Güvenliğiniz için bu sayfadaki tüm işlemleriniz durdurulur.",
-    confirmCloseConfirm: "🚪 Sekmeyi Kapat",
-    confirmCloseCancel: "❌ Vazgeç",
+    confirmCloseConfirm: "Sekmeyi Kapat",
+    confirmCloseCancel: "Vazgeç",
   },
 
   // --- Popup koruma toggle tooltip ---
@@ -262,10 +276,9 @@ const tr = {
     welcomeLink: "Buraya",
     welcomeLinkTitle: "Dijital Savunma sitesine git",
     welcomeSuffix: " tıklayarak benimle ilgili bilgilere ulaşabilirsiniz.",
-    todayPrefix: "Şu ana kadar sizin için ",
-    todayChecked: " kontrol yaptım.",
-    todayThreats: " tehdit buldum.",
-    todayUnknowns: " potansiyel risk tespit ettim.",
+    todayChecked: " adres kontrol edildi.",
+    todayThreats: " tehlikeli adres bulundu.",
+    todayUnknowns: " şüpheli durum tespit edildi.",
     protectedDays: (n: number) => `${n} gündür korunuyorsunuz`,
     glossary: {
       controlLabel: "Kontrol",
@@ -282,10 +295,10 @@ const tr = {
       whitelistDesc: "Güvenilir olduğunu bildiğiniz siteleri eklediğiniz alandır. Bu siteler güvenli kabul edilir. Güvendiğiniz bağlantılara ayarlar kısmından ulaşabilirsiniz.",
       blacklistLabel: "Engellediğim Bağlantılar",
       blacklistDesc: "Riskli veya engellenmesini istediğiniz sitelerin tutulduğu listedir.",
-      threatLabel: "Tehdit",
-      threatDesc: "Zararlı, şüpheli veya kullanıcı güvenliğini riske atabilecek bağlantıları ifade eder.",
-      unknownLabel: "Potansiyel Risk",
-      unknownDesc: "Sistemin kesin olarak güvenli veya riskli sınıflandıramadığı bağlantıları gösterir. İsterseniz bu siteleri ayarlar kısmından güvendiğiniz bağlantılara ekleyebilirsiniz.",
+      threatLabel: "Tehlikeli Adresler",
+      threatDesc: "Zararlı, sahte veya kullanıcı güvenliğini riske atan, tuzak amaçlı kurulmuş adresleri ifade eder.",
+      unknownLabel: "Şüpheli Durumlar",
+      unknownDesc: "Sistemin kesin olarak güvenli veya tehlikeli olarak sınıflandıramadığı, sayfa veya adres üzerinde dikkat çeken işaretler gözlenen siteleri gösterir. İsterseniz bu siteleri ayarlar kısmından güvendiğiniz bağlantılara ekleyebilirsiniz.",
     },
   },
 
@@ -312,21 +325,21 @@ const tr = {
   // boylece sifir bir "ariza" gibi degil, asistanin gorevini sessizce yaptigi
   // gibi okunur.
   skorCards: {
-    control: "Tarama Geçmişi",
-    controlZero: "Taranan öğe yok",
-    controlClose: "Tarama Geçmişini Kapat",
-    controlTooltip: "Tarama geçmişi listesini görmek için tıklayın",
-    controlTooltipClose: "Tarama geçmişi listesini kapatmak için tıklayın",
-    threat: "Engellenen Tehdit",
-    threatZero: "Tehdit bulunmadı",
-    threatClose: "Tehdit Listesini Kapat",
-    threatTooltip: "Engellenen tehdit listesini görmek için tıklayın",
-    threatTooltipClose: "Engellenen tehdit listesini kapatmak için tıklayın",
-    unknown: "Potansiyel Risk",
-    unknownZero: "Risk tespit edilmedi",
-    unknownClose: "Potansiyel Risk Listesini Kapat",
-    unknownTooltip: "Potansiyel risk listesini görmek için tıklayın",
-    unknownTooltipClose: "Potansiyel risk listesini kapatmak için tıklayın",
+    control: "Kontrol Geçmişi",
+    controlZero: "Kontrol edilen öğe yok",
+    controlClose: "Kontrol Geçmişini Kapat",
+    controlTooltip: "Kontrol geçmişi listesini görmek için tıklayın",
+    controlTooltipClose: "Kontrol geçmişi listesini kapatmak için tıklayın",
+    threat: "Tehlikeli Adresler",
+    threatZero: "Tehlikeli adres bulunmadı",
+    threatClose: "Tehlikeli Adres Listesini Kapat",
+    threatTooltip: "Tehlikeli adres listesini görmek için tıklayın",
+    threatTooltipClose: "Tehlikeli adres listesini kapatmak için tıklayın",
+    unknown: "Şüpheli Durumlar",
+    unknownZero: "Şüpheli durum tespit edilmedi",
+    unknownClose: "Şüpheli Durum Listesini Kapat",
+    unknownTooltip: "Şüpheli durum listesini görmek için tıklayın",
+    unknownTooltipClose: "Şüpheli durum listesini kapatmak için tıklayın",
   },
 
   // --- Skor halkasi altinda gosterilen dinamik analiz ozetleri ---
@@ -339,11 +352,11 @@ const tr = {
     safeActive: (count: number) =>
       `${count} farklı güvenli sitede gezindiniz.`,
     safeClean: "Henüz güvenli ziyaret kaydı yok.",
-    threatActive: (count: number) => `${count} adet tehlike engellendi.`,
-    threatClean: "Tehdit bulunmadı",
+    threatActive: (count: number) => `${count} adet tehlikeli adres tespit edildi.`,
+    threatClean: "Tehlikeli adres bulunmadı",
     riskActive: (count: number) =>
-      `${count} adet potansiyel risk tespit edildi.`,
-    riskClean: "Potansiyel risk bulunmadı",
+      `${count} adet şüpheli durum tespit edildi.`,
+    riskClean: "Şüpheli durum bulunmadı",
     scanOn: "Detaylı Güvenlik Taraması aktif ve koruyor.",
     scanOff: "'Detaylı Güvenlik Taraması' modülü pasif.",
     pointSuffix: "Puan",
@@ -352,21 +365,21 @@ const tr = {
   // --- Dashboard skor sifirlama ---
   resetScore: {
     button: "Skoru sıfırla",
-    confirmTitle: "Günlük skoru sıfırlamak istediğinizden emin misiniz?",
+    confirmTitle: "🔄 Günlük skoru sıfırlamak istediğinizden emin misiniz?",
     confirmBody:
-      "Skor 100'e dönecek, oturum içi sayaçlarınız (Kontrol / Tehdit / Takipçi / Şüpheli) ve tarama geçmişi temizlenecektir. Ayarlarınız ve güvendiğiniz bağlantılar etkilenmez.",
-    confirmYes: "Evet, sıfırla",
+      "Skorunuz 100'e dönecek ve bugünkü tüm verileriniz (Kontrol Geçmişi, Tehlikeli Adresler ve Şüpheli Durumlar) temizlenecektir. Genel ayarlarınız ve güvendiğiniz bağlantılar bu işlemden etkilenmez.",
+    confirmYes: "Evet, Sıfırla",
     confirmCancel: "Vazgeç",
   },
 
   // --- Dashboard skor halkasi (circular ring) ---
   scoreRing: {
-    safeTitle: "Alparslan koruyor, durumunuz iyi.",
-    safeSubtitle: "Bağlantılarınız güvende.",
-    mediumTitle: "Alparslan koruyor, dikkat seviyesi orta.",
-    mediumSubtitle: "Bazı bağlantılar dikkat gerektiriyor.",
-    riskyTitle: "Alparslan koruyor, dikkat seviyesi yüksek.",
-    riskySubtitle: "Bağlantılarınız riskli olabilir.",
+    safeTitle: "Harika, tamamen güvendesiniz!",
+    safeSubtitle: "Her şey temiz, keyifli gezintiler.",
+    mediumTitle: "Lütfen biraz daha dikkatli olun!",
+    mediumSubtitle: "Şüpheli durumlar var, şifre girerken tedbirli olun.",
+    riskyTitle: "Dikkat, tehlikeli adresler bulundu!",
+    riskySubtitle: "Kontrol geçmişinizde sahte veya dolandırıcı siteler mevcut.",
   },
 
   // --- Dashboard skoru yükselten baglantilar paneli ---
