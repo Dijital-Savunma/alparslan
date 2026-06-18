@@ -85,7 +85,8 @@ export function NotificationPanel({
         {t.notificationCenter.welcomeSuffix}
       </div>
 
-      {/* Protected days badge */}
+      {/* Protected days badge — saat emojisi: zamanin gectigini, koruma
+          suresini gozle ifade eder. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <div
           style={{
@@ -100,7 +101,7 @@ export function NotificationPanel({
             fontSize: 14,
           }}
         >
-          🛡️
+          🕒
         </div>
         <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>
           {t.notificationCenter.protectedDays(protectedDays)}
@@ -108,21 +109,22 @@ export function NotificationPanel({
       </div>
 
       {/* Cumulative summary — Skor / Durum panelleriyle ayni veriden besleniyor:
-          control = history.length, tehdit = DANGEROUS|SUSPICIOUS, risk = UNKNOWN. */}
-      <div style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text)", marginBottom: 10 }}>
+          control = history.length, tehdit = DANGEROUS|SUSPICIOUS, risk = UNKNOWN.
+          Her satirin onunde rolu yansitan emoji (📊 / 🚨 / ⚠️), arkasinda
+          renkli bold sayi, sonra passive-voice cumle ("kontrol edildi"). */}
+      <div style={{ fontSize: 12, lineHeight: 1.7, color: "var(--text)", marginBottom: 10 }}>
         <div>
-          {t.notificationCenter.todayPrefix}
-          <strong style={{ color: "var(--accent-info-deep)" }}>{controlCount}</strong>
+          📊 <strong style={{ color: "var(--accent-info-deep)" }}>{controlCount}</strong>
           {t.notificationCenter.todayChecked}
         </div>
         <div>
-          <strong style={{ color: threatCount > 0 ? "var(--accent-danger)" : "var(--accent-success)" }}>
+          🚨 <strong style={{ color: threatCount > 0 ? "var(--accent-danger)" : "var(--accent-success)" }}>
             {threatCount}
           </strong>
           {t.notificationCenter.todayThreats}
         </div>
         <div>
-          <strong style={{ color: unknownCount > 0 ? "#3640a0" : "var(--accent-success)" }}>
+          ⚠️ <strong style={{ color: unknownCount > 0 ? "#3640a0" : "var(--accent-success)" }}>
             {unknownCount}
           </strong>
           {t.notificationCenter.todayUnknowns}

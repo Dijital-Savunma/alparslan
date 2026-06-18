@@ -175,9 +175,9 @@ export default function DashboardTab() {
   return (
     <div style={{ padding: 14, background: "var(--surface)" }}>
       {/* Title above the ring */}
-      <div style={{ textAlign: "center", marginBottom: 6 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", letterSpacing: 0.3 }}>
-          Günlük skor
+      <div style={{ textAlign: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)", letterSpacing: 0.5 }}>
+          Günlük Skor
         </div>
       </div>
 
@@ -441,28 +441,15 @@ export default function DashboardTab() {
             <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 16 }}>
               {t.resetScore.confirmBody}
             </div>
+            {/* Buton hiyerarsi: Kullanici "Skoru sifirla"ya bilerek tikladi —
+                yani "Evet, Sifirla" niyet edilen birincil eylem; o yuzden
+                dolgun mavi + soldaki yer onun. "Vazgec" ikincil/escape route
+                olarak sade outline'da kalir. Tersi olunca kullanici refleksle
+                mavi butona basip iptal ediyor, sifirlanmiyor.
+                Vertical align: line-height=1 + display:flex + alignItems
+                center her iki butonda metni dikeyde tam ortalar (font weight
+                farkindan dogan kayma artik yok). */}
             <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-                style={{
-                  flex: 1,
-                  padding: "9px 8px",
-                  background: "#2563eb",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 9,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  boxShadow: "0 3px 8px rgba(37,99,235,0.30)",
-                  transition: "transform 0.15s ease",
-                }}
-              >
-                {t.resetScore.confirmCancel}
-              </button>
               <button
                 onClick={() => {
                   setShowResetConfirm(false);
@@ -472,19 +459,48 @@ export default function DashboardTab() {
                 onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
                 style={{
                   flex: 1,
-                  padding: "9px 8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "10px 8px",
+                  background: "#2563eb",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 9,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  boxShadow: "0 3px 8px rgba(37,99,235,0.30)",
+                  transition: "transform 0.15s ease",
+                }}
+              >
+                {t.resetScore.confirmYes}
+              </button>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "10px 8px",
                   background: "transparent",
                   color: "var(--text-muted)",
                   border: "1px solid var(--border-strong)",
                   borderRadius: 9,
                   fontSize: 12,
                   fontWeight: 500,
+                  lineHeight: 1,
                   cursor: "pointer",
                   fontFamily: "inherit",
                   transition: "transform 0.15s ease",
                 }}
               >
-                {t.resetScore.confirmYes}
+                {t.resetScore.confirmCancel}
               </button>
             </div>
           </div>
@@ -514,16 +530,6 @@ function ScoreInsight({
   const animatedDelta = useCountUp(delta ?? 0, 300);
   return (
     <div
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-1px)";
-        e.currentTarget.style.boxShadow = isWarn
-          ? "0 4px 10px rgba(220, 38, 38, 0.10)"
-          : "0 4px 10px rgba(22, 163, 74, 0.10)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.03)";
-      }}
       style={{
         display: "flex",
         alignItems: "center",
@@ -539,7 +545,6 @@ function ScoreInsight({
         color: "var(--text)",
         lineHeight: 1.4,
         boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
-        transition: "transform 0.18s ease, box-shadow 0.18s ease",
       }}
     >
       {/* Status dot: solid renkli daire + halka glow. */}
@@ -661,7 +666,16 @@ export function SkorCountButton({
       {value > 0 ? (
         <span style={{ fontSize: 15, fontWeight: 800, flexShrink: 0, minWidth: 20, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{animatedValue}</span>
       ) : (
-        <span style={{ fontSize: 10.5, fontWeight: 500, flexShrink: 0, opacity: 0.85, fontStyle: "italic" }}>{zeroText}</span>
+        // Bos durumda uzun cumle ("Tehlikeli adres bulunmadi") yer kapliyordu;
+        // label zaten ne sayildigini soyluyor, "0" tek basina yeterli ve
+        // butun butonlarda layout dengesi korunuyor. zeroText prop'u native
+        // tooltip'te tasiniyor (`activeTitle` / `title` yedek).
+        <span
+          title={zeroText}
+          style={{ fontSize: 15, fontWeight: 800, flexShrink: 0, minWidth: 20, textAlign: "right", fontVariantNumeric: "tabular-nums", opacity: 0.4 }}
+        >
+          0
+        </span>
       )}
       <span
         style={{
@@ -742,7 +756,7 @@ export function SkorFilteredList({
       >
         {title}
       </div>
-      <div style={{ maxHeight: 180, overflowY: "auto" }}>
+      <div className="alparslan-thin-scroll" style={{ maxHeight: 180, overflowY: "auto" }}>
         {shown.length === 0 ? (
           <div style={{ padding: "12px 16px", fontSize: 12, color: emptyColor, textAlign: "center" }}>
             {emptyMessage}

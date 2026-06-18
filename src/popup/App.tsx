@@ -4,7 +4,7 @@ import TabBar, { type TabId } from "./TabBar";
 import DashboardTab from "./DashboardTab";
 import BreachBadge from "./BreachBadge";
 import { normalizeQuickWhitelistDomain, isDomainInWhitelist } from "./whitelist-helpers";
-import { useInitProgress } from "./hooks/useInitProgress";
+import { useInitProgress, useSmoothPercent } from "./hooks/useInitProgress";
 import { useExtensionEnabled } from "./hooks/useExtensionEnabled";
 import { useScanHistory } from "./hooks/useScanHistory";
 import { useExtensionSettings } from "./hooks/useExtensionSettings";
@@ -50,6 +50,26 @@ export default function App() {
   // Init durumu artik useInitProgress hook'unda — backoff'lu polling,
   // session marker okuma, cleanup. Component sadece 2 deger okuyor.
   const { initStatus, initDoneSession } = useInitProgress();
+  // Yukleme bari: SW'den gelen tepe yuzde "atlamali" — local olarak
+  // hedefe dogru yumusakca yaklastir (1 puan/18ms = saniyede ~55 puan).
+  const smoothPercent = useSmoothPercent(initStatus?.percent ?? 0);
+  // Eger popup'in goruntu omru icinde SW HIC "not ready" durumda
+  // gorunmediyse, gercek anlamda bir yukleme yok demektir — loader'i hic
+  // gosterme. Bu, "SW init bitmis ama sessionStart marker'i yazilmadan
+  // popup acildi" race'inin yarattigi sahte yukleme animasyonunu engeller.
+  const [sawLoading, setSawLoading] = useState(false);
+  useEffect(() => {
+    if (initStatus && !initStatus.ready) setSawLoading(true);
+  }, [initStatus]);
+  // "Yukleniyor..." basliginin sonundaki noktalari canli yap — kullanici
+  // ekranin donmadigini surekli gormeli.
+  const [loadingDots, setLoadingDots] = useState("");
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setLoadingDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 400);
+    return () => window.clearInterval(id);
+  }, []);
   const [url, setUrl] = useState<string>("");
   const [status, setStatus] = useState<SecurityStatus>("loading");
   // Enabled toggle + storage senkron mantigi useExtensionEnabled hook'unda.
@@ -269,7 +289,11 @@ export default function App() {
   // start of the Chrome session. `initDoneSession === false` means the bar
   // hasn't run yet this session; `null` (still reading the flag) or `true`
   // both suppress it so silent worker restarts don't flash the bar again.
-  if (initDoneSession === false && initStatus && !initStatus.ready) {
+  // Loader'i kapatmadan once smooth bar 100'e ulassin — yoksa "ready"
+  // sinyali bir anda gelirse kullanici climb'in son saniyesini hic gormez.
+  // Ek olarak `sawLoading` istiyoruz ki SW'yi zaten bitmis durumda
+  // yakalarsak hic loader gostermeyelim (sahte climb yok).
+  if (initDoneSession === false && initStatus && sawLoading && (!initStatus.ready || smoothPercent < 100)) {
     return (
       <div style={{ width: 340, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: 14 }}>
         <div
@@ -288,35 +312,82 @@ export default function App() {
           <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.3, color: "#f8fafc" }}>Alparslan</span>
         </div>
         <div style={{ padding: "32px 24px", textAlign: "center" }}>
+          {/* Sonundaki "..." statik degil, canli — kullanici "ekran dondu mu"
+              diye dusunmesin diye 400ms turda nokta beliriyor / kayboluyor.
+              Noktalar sabit-genislik bir span'de durur (min-width: 18px,
+              left-aligned), boylece cumle merkez disiplinini bozup
+              titreyerek saga sola kaymaz. */}
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 16 }}>
-            {initStatus.step}
+            {initStatus.step.replace(/\.+$/, "")}
+            <span style={{ display: "inline-block", width: 18, textAlign: "left", fontVariantNumeric: "tabular-nums" }}>
+              {loadingDots}
+            </span>
           </div>
-          {/* Progress bar */}
+          {/* Progress bar — width animasyonu artik smoothPercent tarafindan
+              tikatik yapildigi icin CSS transition'a gerek yok (yoksa cift
+              animasyon olusur). */}
           <div style={{ height: 6, borderRadius: 3, background: "var(--ring-track)", overflow: "hidden", marginBottom: 12 }}>
             <div
               style={{
                 height: "100%",
-                width: initStatus.percent + "%",
+                width: smoothPercent + "%",
                 background: "linear-gradient(90deg, #3b82f6, #2563eb)",
                 borderRadius: 3,
-                transition: "width 0.3s ease",
+                transition: "width 0.05s linear",
               }}
             />
           </div>
-          <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>
-            %{initStatus.percent}
+          <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16, fontVariantNumeric: "tabular-nums" }}>
+            %{smoothPercent}
           </div>
-          {/* Step checklist */}
+          {/* Step checklist \u2014 ilk pending step ("o anda yuklenen") loadingPulse
+              animasyonu ile nefes alir, kullanici hangi adimin o an aktif
+              oldugunu net gorur. Sirasi geleli olmayan adimlar sakin gri. */}
           <div style={{ textAlign: "left", display: "inline-block" }}>
-            {initStatus.steps.map((s, i) => (
-              <div key={i} style={{ fontSize: 12, color: s.done ? "#16a34a" : "#9ca3af", padding: "2px 0", display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 14 }}>{s.done ? "\u2713" : "\u25CB"}</span>
-                <span>{s.name}</span>
-                {s.done && s.ms !== undefined && (
-                  <span style={{ fontSize: 10, color: "#b0b5bd" }}>{s.ms}ms</span>
-                )}
-              </div>
-            ))}
+            {(() => {
+              const firstPendingIdx = initStatus.steps.findIndex((x) => !x.done);
+              return initStatus.steps.map((s, i) => {
+                const isCurrent = i === firstPendingIdx;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      fontSize: 12,
+                      color: s.done ? "#16a34a" : isCurrent ? "#2563eb" : "#9ca3af",
+                      padding: "2px 0",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontWeight: isCurrent ? 600 : 400,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 14,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 14,
+                        height: 14,
+                        animation: isCurrent ? "loadingPulse 1.1s ease-in-out infinite" : "none",
+                      }}
+                    >
+                      {s.done ? "\u2713" : "\u25CB"}
+                    </span>
+                    <span>{s.name}</span>
+                    {s.done && s.ms !== undefined && (
+                      <span style={{ fontSize: 10, color: "#b0b5bd" }}>{s.ms}ms</span>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
+          {/* Alt taraftaki kucuk reassurance metni — kullanicinin "ne bekledigim
+              belli mi" sorusunu yatistirir, banking/guvenlik uygulamalari
+              tarzinda sade ve profesyonel. */}
+          <div style={{ marginTop: 20, fontSize: 10.5, color: "#9ca3af", fontStyle: "italic", letterSpacing: 0.2 }}>
+            Güvenlik verileri senkronize ediliyor, lütfen bekleyin.
           </div>
         </div>
       </div>
@@ -377,7 +448,6 @@ export default function App() {
         isWhitelisted={isWhitelisted}
         popupWhitelistInput={popupWhitelistInput}
         setPopupWhitelistInput={setPopupWhitelistInput}
-        handleAddToWhitelist={handleAddToWhitelist}
         setShowCloseConfirm={setShowCloseConfirm}
         setShowTrustConfirm={setShowTrustConfirm}
         enabled={enabled}
@@ -427,25 +497,35 @@ export default function App() {
               transition: "transform 0.15s ease",
             }}
           >
-            🟢 {t.confirmDisableNotif.keep}
+            {t.confirmDisableNotif.keep}
           </button>
           <button
             onClick={() => {
               saveSettings({ ...settings, showDomWarnings: false });
               setShowDisableConfirm(false);
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--surface-elevated)";
+              e.currentTarget.style.borderColor = "var(--border-strong)";
+              e.currentTarget.style.transform = "scale(1.02)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.borderColor = "var(--border-strong)";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
             style={{
               width: "100%",
-              padding: "6px 0",
+              padding: "10px 0",
               background: "transparent",
-              border: "none",
-              color: "var(--text-faint)",
-              fontSize: 12,
+              border: "1px solid var(--border-strong)",
+              borderRadius: 10,
+              color: "var(--text-muted)",
+              fontSize: 12.5,
+              fontWeight: 600,
               cursor: "pointer",
               fontFamily: "inherit",
-              transition: "transform 0.15s ease",
+              transition: "background 0.15s ease, border-color 0.15s ease, transform 0.15s ease",
             }}
           >
             {t.confirmDisableNotif.disable}
@@ -454,9 +534,10 @@ export default function App() {
       )}
 
       {/* "Sayfadan Ayrıl" confirmation — closing the dangerous tab IS the safe
-          move here, so the filled "Sekmeyi Kapat" button is dominant. "Vazgeç"
-          stays transparent so a reflex tap on it leaves the user back on the
-          warning, not still on the page. */}
+          move here. "Sekmeyi Kapat" is filled green (success accent) so the eye
+          lands on the safe choice as inviting / calming, not aggressive blue.
+          "Vazgeç" stays transparent so a reflex tap on it leaves the user
+          back on the warning, not still on the page. */}
       {showCloseConfirm && (
         <ConfirmModal
           title={t.speechBubble.confirmCloseTitle}
@@ -473,7 +554,7 @@ export default function App() {
               style={{
                 flex: 1,
                 padding: "9px 8px",
-                background: "var(--accent-info)",
+                background: "var(--accent-success)",
                 color: "white",
                 border: "none",
                 borderRadius: 9,
@@ -481,7 +562,7 @@ export default function App() {
                 fontWeight: 700,
                 cursor: "pointer",
                 fontFamily: "inherit",
-                boxShadow: "0 3px 8px rgba(37,99,235,0.35)",
+                boxShadow: "0 3px 8px rgba(22,163,74,0.35)",
                 transition: "transform 0.15s ease",
               }}
             >
@@ -511,37 +592,19 @@ export default function App() {
         </ConfirmModal>
       )}
 
-      {/* "Bu Adrese Güven" confirmation — staying away IS the safe move here,
-          so "Vazgeç" is the dominant filled-gray button (easy reflex tap).
-          "Evet, Güven" is the subtle outlined button with a faint amber tint
-          so the user has to deliberately aim at it to take the risk. */}
+      {/* "Bu Adrese Güven" confirmation — staying away IS the safe move here.
+          Windows/web convention: sol = aksiyon ("Evet, Güven", riskli),
+          sağ = iptal/güvenli ("Vazgeç"). Görsel ağırlık tersine: "Vazgeç"
+          dolgu yeşil (kullanıcının refleks taraf), "Evet, Güven" sade amber
+          outline (riski almak için kullanıcı bilinçli aim atmalı). Sonuç:
+          okuma sağa varır → göz "Vazgeç" üstünde durur, refleks koruma
+          yönünde çalışır. */}
       {showTrustConfirm && (
         <ConfirmModal
           title={t.speechBubble.confirmTrustTitle}
           body={t.speechBubble.confirmTrustBody}
         >
           <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => setShowTrustConfirm(false)}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-              style={{
-                flex: 1,
-                padding: "9px 8px",
-                background: "#475569",
-                color: "white",
-                border: "none",
-                borderRadius: 9,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                boxShadow: "0 3px 8px rgba(71,85,105,0.30)",
-                transition: "transform 0.15s ease",
-              }}
-            >
-              {t.speechBubble.confirmTrustCancel}
-            </button>
             <button
               onClick={() => {
                 setShowTrustConfirm(false);
@@ -564,6 +627,27 @@ export default function App() {
               }}
             >
               {t.speechBubble.confirmTrustConfirm}
+            </button>
+            <button
+              onClick={() => setShowTrustConfirm(false)}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+              style={{
+                flex: 1,
+                padding: "9px 8px",
+                background: "var(--accent-success)",
+                color: "white",
+                border: "none",
+                borderRadius: 9,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                boxShadow: "0 3px 8px rgba(22,163,74,0.35)",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              {t.speechBubble.confirmTrustCancel}
             </button>
           </div>
         </ConfirmModal>

@@ -1,6 +1,42 @@
+import { useEffect, useState, type ReactNode } from "react";
 import { type ScanHistoryEntry } from "@/utils/types";
 import t from "@/i18n/tr";
 import { SkorCountButton, SkorFilteredList } from "../DashboardTab";
+
+/**
+ * Sayac karti altina acilan listelerin acilis/kapanis animasyonunu
+ * hayata gecirir.
+ *
+ * Eskiden `{condition && <List />}` ile anlik unmount oluyor → liste "sak"
+ * diye kayboluyordu. Burada `open=false`'a gecince once kapanis animasyonu
+ * tetiklenir (history-panel-lift), 240ms sonra gercek unmount. Acilirken
+ * icteki SkorFilteredList kendi history-panel-drop class'i ile zaten
+ * yumusakca giriyor; wrapper saydam kalir.
+ */
+const CLOSE_ANIM_MS = 380;
+function CollapsibleListSection({ open, children }: { open: boolean; children: ReactNode }) {
+  const [render, setRender] = useState(open);
+  const [closing, setClosing] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setRender(true);
+      setClosing(false);
+      return;
+    }
+    if (!render) return;
+    setClosing(true);
+    const id = window.setTimeout(() => {
+      setRender(false);
+      setClosing(false);
+    }, CLOSE_ANIM_MS);
+    return () => window.clearTimeout(id);
+  }, [open, render]);
+
+  if (!render) return null;
+
+  return <div className={closing ? "history-panel-lift" : ""}>{children}</div>;
+}
 
 /**
  * Durum sekmesinin altinda gosterilen 3 sayac kartı (Tarama Geçmişi /
@@ -43,9 +79,9 @@ export function DurumSkorCards({
         title={t.skorCards.controlTooltip}
         activeTitle={t.skorCards.controlTooltipClose}
       />
-      {durumSkorFilter === "control" && (
+      <CollapsibleListSection open={durumSkorFilter === "control"}>
         <SkorFilteredList filter="control" history={history} />
-      )}
+      </CollapsibleListSection>
 
       <SkorCountButton
         icon="🚨"
@@ -59,9 +95,9 @@ export function DurumSkorCards({
         title={t.skorCards.threatTooltip}
         activeTitle={t.skorCards.threatTooltipClose}
       />
-      {durumSkorFilter === "threat" && (
+      <CollapsibleListSection open={durumSkorFilter === "threat"}>
         <SkorFilteredList filter="threat" history={history} />
-      )}
+      </CollapsibleListSection>
 
       <SkorCountButton
         icon="❔"
@@ -75,9 +111,9 @@ export function DurumSkorCards({
         title={t.skorCards.unknownTooltip}
         activeTitle={t.skorCards.unknownTooltipClose}
       />
-      {durumSkorFilter === "unknown" && (
+      <CollapsibleListSection open={durumSkorFilter === "unknown"}>
         <SkorFilteredList filter="unknown" history={history} />
-      )}
+      </CollapsibleListSection>
     </div>
   );
 }

@@ -228,14 +228,53 @@ body { background: var(--surface); color: var(--text); transition: background 0.
 /* Detay listeleri ("panjur gecisi") — list panel slides+fades in, then each
    row staggers in 25 ms apart up to the 12th, after which rows appear instantly
    (so a 50-item history doesn't take 1.25 s to finish entering). Total entry
-   animation tops out around 0.6 s. */
+   animation tops out around 0.6 s.
+
+   Acilis 0.32s -> 0.42s'e yavaslatildi (zarif his); kapanis icin de ayri bir
+   keyframe (historyPanelLift) eklendi, eskiden component anlik unmount
+   olup "sak" diye kayboluyordu, simdi 0.24s ile yukari hafifce kayip
+   solarak gider. CollapsibleListSection delayed-unmount handle eder. */
 @keyframes historyPanelDrop {
-  0%   { opacity: 0; transform: translateY(-4px); }
+  0%   { opacity: 0; transform: translateY(-6px); }
   100% { opacity: 1; transform: translateY(0); }
 }
+@keyframes historyPanelLift {
+  0%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
 .history-panel-drop {
-  animation: historyPanelDrop 0.32s ease-out;
+  animation: historyPanelDrop 0.55s cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: top;
+}
+.history-panel-lift {
+  animation: historyPanelLift 0.38s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+  transform-origin: top;
+}
+
+/* Zarif "phantom" scrollbar — varsayilan kalin gri thumb yerine ince,
+   yarisaydam, yuvarlatilmis bir thumb. Track tamamen seffaf, koseler
+   yumusak; liste icindeyken arayuze dahil olmus gibi durur. Hover'da
+   bir tik koyulasir ama hala incedir.
+   Sadece .alparslan-thin-scroll class'iyla aktif olur, baska liste/scroll
+   bolgelerine sizmaz. */
+.alparslan-thin-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.alparslan-thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.alparslan-thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+.alparslan-thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.55);
+}
+.alparslan-thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 @keyframes historyRowFade {
   0%   { opacity: 0; transform: translateY(-4px); }
@@ -253,6 +292,15 @@ body { background: var(--surface); color: var(--text); transition: background 0.
   100% { box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05); border-color: var(--border); }
 }
 .setting-card-saved { animation: settingSavedPulse 0.6s ease-out; }
+
+/* Status dot icin "kontrol ediliyor" pulse — durum belirsizken kullaniciyi
+   "ekran donmus mu?" endisesinden kurtaracak sade soluk-belirgin nefes
+   alma. Opaklik + hafif scale ile sessiz, gozalici degil. */
+@keyframes loadingPulse {
+  0%   { opacity: 0.55; transform: scale(1); }
+  50%  { opacity: 1;    transform: scale(1.18); }
+  100% { opacity: 0.55; transform: scale(1); }
+}
 
 /* HOVER UTILITY: Ayar karti (ve benzer tiklanabilir kartlar) icin
    state-independent hover efekti. Boylece bilesenler onMouseEnter/Leave
