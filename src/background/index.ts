@@ -209,8 +209,16 @@ async function initServiceWorker(): Promise<void> {
   // fetch arka planda tamamlanmaya devam ediyor, sadece UI bekletmiyor.
   const STEP_BUDGET_MS = 5000;
   function withStepTimeout<T>(p: Promise<T>, label: string): Promise<T | void> {
+    // p.catch ile asıl promise'in late rejection'ını sessizce yutuyoruz —
+    // timeout race'i kazandiktan sonra orijinal fetch/IDB hata firlatirsa
+    // chrome unhandled rejection'i konsola dokuyordu (mertinkos review).
+    // Buradaki amac zaten "geçti sayalim, arka planda gitsin" oldugu icin
+    // gec gelen hata sadece logger.warn'a dusurulup gomuluyor.
+    const safeP = p.catch((err) => {
+      logger.warn(`${label} late rejection (after timeout):`, err);
+    });
     return Promise.race([
-      p,
+      safeP,
       new Promise<void>((resolve) =>
         setTimeout(() => {
           logger.warn(`${label} exceeded ${STEP_BUDGET_MS}ms budget — letting SW init continue, finish in background`);

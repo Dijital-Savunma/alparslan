@@ -15,7 +15,7 @@ import { ConfirmModal } from "@/components/ConfirmModal";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { DurumSkorCards } from "./components/DurumSkorCards";
-import { StatusPanel } from "./components/StatusPanel";
+import { StatusPanel, useLoadingDots } from "./components/StatusPanel";
 import t from "@/i18n/tr";
 
 export type SecurityStatus = "safe" | "dangerous" | "suspicious" | "unknown" | "loading" | "disabled";
@@ -62,14 +62,15 @@ export default function App() {
     if (initStatus && !initStatus.ready) setSawLoading(true);
   }, [initStatus]);
   // "Yukleniyor..." basliginin sonundaki noktalari canli yap — kullanici
-  // ekranin donmadigini surekli gormeli.
-  const [loadingDots, setLoadingDots] = useState("");
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setLoadingDots((prev) => (prev.length >= 3 ? "" : prev + "."));
-    }, 400);
-    return () => window.clearInterval(id);
-  }, []);
+  // ekranin donmadigini surekli gormeli. Hook sadece loader gercekten
+  // gozukurken interval kurar; aksi halde 400ms interval popup'in tum
+  // omru boyunca bos yere calisirdi (mertinkos review).
+  const loaderVisible =
+    initDoneSession === false &&
+    !!initStatus &&
+    sawLoading &&
+    (!initStatus.ready || smoothPercent < 100);
+  const loadingDots = useLoadingDots(loaderVisible);
   const [url, setUrl] = useState<string>("");
   const [status, setStatus] = useState<SecurityStatus>("loading");
   // Enabled toggle + storage senkron mantigi useExtensionEnabled hook'unda.
@@ -293,7 +294,7 @@ export default function App() {
   // sinyali bir anda gelirse kullanici climb'in son saniyesini hic gormez.
   // Ek olarak `sawLoading` istiyoruz ki SW'yi zaten bitmis durumda
   // yakalarsak hic loader gostermeyelim (sahte climb yok).
-  if (initDoneSession === false && initStatus && sawLoading && (!initStatus.ready || smoothPercent < 100)) {
+  if (loaderVisible && initStatus) {
     return (
       <div style={{ width: 340, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: 14 }}>
         <div

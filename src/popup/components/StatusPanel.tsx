@@ -9,7 +9,7 @@ import { type SecurityStatus } from "../App";
  * dondurur. Sadece displayStatus === "loading" iken interval kurulur, baska
  * durumda hemen "" kalır. Boylece kullanici "ekran dondu mu" diye dusunmez.
  */
-function useLoadingDots(active: boolean): string {
+export function useLoadingDots(active: boolean): string {
   const [dots, setDots] = useState("");
   useEffect(() => {
     if (!active) {

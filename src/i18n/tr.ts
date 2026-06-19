@@ -149,16 +149,6 @@ const tr = {
     confirm: "Evet, Hepsini Temizle",
   },
 
-  // --- Detayli Guvenlik Taramasi kapatma onayi (options) ---
-  // Tehlike Uyarilari modeli ile ayni: kullanici kapatmadan once net
-  // bir karsi-niyet onayi alir, refleksle kapatmasin.
-  confirmDisableNetworkMonitoring: {
-    message: "🔍 Detaylı Güvenlik Taramasını kapatmak istediğinizden emin misiniz?",
-    detail: "Kapatırsanız, Alparslan sitelerin arkasında gizlenmiş takipçi ve tehdit isteklerini izlemeyi durdurur. Adres seviyesindeki temel korumanız çalışmaya devam eder.",
-    keep: "Hayır, Tarama Açık Kalsın",
-    disable: "Evet, Taramayı Kapat",
-  },
-
   // --- Popup ag izleme ---
   networkStats: {
     title: "Bu Sayfa - Ağ İzleme",
