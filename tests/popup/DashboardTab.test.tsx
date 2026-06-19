@@ -22,7 +22,6 @@ describe("DashboardTab", () => {
       uniqueSafe: 0,
       uniqueThreat: 0,
       uniqueUnknown: 1,
-      scanOn: true,
     },
   };
 

@@ -809,7 +809,6 @@ chrome.runtime.onMessage.addListener(
           uniqueSafe: uniqueSafeDomains,
           uniqueThreat: uniqueThreatDomains,
           uniqueUnknown: uniqueUnknownDomains,
-          scanOn: freshSettings.networkMonitoringEnabled !== false,
         };
         sendResponse({ dashboard });
       })();

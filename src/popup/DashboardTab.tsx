@@ -120,12 +120,9 @@ export default function DashboardTab() {
   const uniqueUnknownCount = ic?.uniqueUnknown ?? new Set(
     history.filter((h) => h.level === "UNKNOWN").map((h) => h.domain),
   ).size;
-  const scanIsOn = ic?.scanOn ?? (settings ? settings.networkMonitoringEnabled !== false : true);
-
   // Formul: 100 baslangic
   //   − tehdit  × 10
   //   − risk    × 5
-  //   − (ayar kapali ? 10 : 0)
   //   + guvenli × 1
   //   + (tehdit yoksa +10 odul)
   //   + (risk yoksa  +5  odul)
@@ -141,7 +138,6 @@ export default function DashboardTab() {
       100
         - uniqueThreatCount * 10
         - uniqueUnknownCount * 5
-        - (scanIsOn ? 0 : 10)
         + uniqueSafeCount * 1
         + (threatClean ? 10 : 0)
         + (riskClean ? 5 : 0),
@@ -297,7 +293,6 @@ export default function DashboardTab() {
         const uniqueSafeDomains = uniqueSafeCount;
         const uniqueThreatDomains = uniqueThreatCount;
         const uniqueUnknownDomains = uniqueUnknownCount;
-        const scanOn = scanIsOn;
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
             {/* Bolum basligi: dikey gradient accent cubuk + temiz tipografi. */}
@@ -368,14 +363,6 @@ export default function DashboardTab() {
                 text={t.skorBreakdown.riskClean}
                 delta={5}
               />
-            )}
-
-            {/* Detayli Guvenlik Taramasi: kapaliysa -10 puan, aciksa sadece
-                yesil bir bilgi cumlesi (puan eklemiyor, tavani delmiyor). */}
-            {scanOn ? (
-              <ScoreInsight tone="success" text={t.skorBreakdown.scanOn} />
-            ) : (
-              <ScoreInsight tone="warning" text={t.skorBreakdown.scanOff} delta={-10} />
             )}
           </div>
         );

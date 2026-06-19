@@ -347,8 +347,6 @@ const tr = {
     riskActive: (count: number) =>
       `${count} adet şüpheli durum tespit edildi.`,
     riskClean: "Şüpheli durum bulunmadı",
-    scanOn: "Detaylı Güvenlik Taraması aktif ve koruyor.",
-    scanOff: "'Detaylı Güvenlik Taraması' modülü pasif.",
     pointSuffix: "Puan",
   },
 
