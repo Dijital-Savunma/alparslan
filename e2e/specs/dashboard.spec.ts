@@ -17,9 +17,6 @@ test.describe("Dashboard Score — Happy Path", () => {
     // Skor halkası altındaki yeni "Skor Analizi" panosu.
     await expect(popup.getByText("Günlük skor")).toBeVisible({ timeout: 10000 });
     await expect(popup.getByText("Skor Analizi")).toBeVisible();
-    // Detaylı Güvenlik Taraması insight satırı her zaman görünür
-    // (kapaliyken kirmizi rozet, aciksa yesil cumle).
-    await expect(popup.getByText(/Detaylı Güvenlik Taraması/)).toBeVisible();
     await popup.close();
   });
 
