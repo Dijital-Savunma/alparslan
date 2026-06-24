@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { type ThreatResult, type ExtensionStats, type ExtensionSettings } from "@/utils/types";
+import { type ThreatResult, type ExtensionSettings } from "@/utils/types";
 import TabBar, { type TabId } from "./TabBar";
 import DashboardTab from "./DashboardTab";
 import BreachBadge from "./BreachBadge";
@@ -16,6 +16,11 @@ import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { DurumSkorCards } from "./components/DurumSkorCards";
 import { StatusPanel, useLoadingDots } from "./components/StatusPanel";
+import {
+  type DynamicNotification,
+  NOTIFICATIONS_CACHE_STORAGE_KEY,
+  DISMISSED_NOTIFICATION_IDS_STORAGE_KEY,
+} from "@/notifications/dynamic-notifications";
 import t from "@/i18n/tr";
 
 export type SecurityStatus = "safe" | "dangerous" | "suspicious" | "unknown" | "loading" | "disabled";
@@ -30,14 +35,6 @@ const STATUS_CONFIG: Record<Exclude<SecurityStatus, "loading">, { label: string;
   suspicious: { label: t.status.suspicious, color: "#d97706", bg: "rgba(217, 119, 6, 0.10)" },
   unknown: { label: t.status.unknown, color: "var(--text-muted)", bg: "rgba(107, 114, 128, 0.10)" },
   disabled: { label: t.status.disabled, color: "#9ca3af", bg: "rgba(156, 163, 175, 0.10)" },
-};
-
-const STATUS_ICONS: Record<Exclude<SecurityStatus, "loading">, string> = {
-  safe: "\u2705",
-  dangerous: "\uD83D\uDED1",
-  suspicious: "\u26A0\uFE0F",
-  unknown: "\u2753",
-  disabled: "\u23F8\uFE0F",
 };
 
 // InitStatus interface'i ve init polling mantigi src/popup/hooks/useInitProgress.ts
@@ -76,7 +73,6 @@ export default function App() {
   // Enabled toggle + storage senkron mantigi useExtensionEnabled hook'unda.
   const { enabled, toggleEnabled } = useExtensionEnabled();
   const [reasons, setReasons] = useState<string[]>([]);
-  const [stats, setStats] = useState<ExtensionStats>({ urlsChecked: 0, threatsBlocked: 0, trackersBlocked: 0 });
   // Tarama gecmisi (history) yukleme + reaktif senkron mantigi
   // useScanHistory hook'unda. clearLocalHistory hook ustunden gelir.
   const { history } = useScanHistory();
@@ -86,7 +82,6 @@ export default function App() {
   const { settings, setSettings, saveSettings } = useExtensionSettings();
   const [isWhitelisted, setIsWhitelisted] = useState<boolean>(false);
   const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
-  const [infoOpen, setInfoOpen] = useState<boolean>(false);
   // Koruma süresi hesabi (gun) useProtectedDays hook'unda.
   const protectedDays = useProtectedDays();
   const [popupWhitelistInput, setPopupWhitelistInput] = useState<string>("");
@@ -96,6 +91,70 @@ export default function App() {
   // click.
   const [showCloseConfirm, setShowCloseConfirm] = useState<boolean>(false);
   const [showTrustConfirm, setShowTrustConfirm] = useState<boolean>(false);
+  // Dinamik bildirim state'i — popup mount'unda chrome.storage.local'dan
+  // hem cache'lenmis bildirimler hem kullanicinin kalici dismiss ettigi
+  // id'ler okunur. Kullaniciya gosterilecek aktif bildirim = ilk
+  // unread olan (cache sirasi = JSON sirasi).
+  const [cachedNotifications, setCachedNotifications] = useState<DynamicNotification[]>([]);
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([]);
+  useEffect(() => {
+    chrome.storage.local.get(
+      [NOTIFICATIONS_CACHE_STORAGE_KEY, DISMISSED_NOTIFICATION_IDS_STORAGE_KEY],
+      (result) => {
+        const dismissed = result[DISMISSED_NOTIFICATION_IDS_STORAGE_KEY];
+        if (Array.isArray(dismissed)) setDismissedNotificationIds(dismissed as string[]);
+        const cached = result[NOTIFICATIONS_CACHE_STORAGE_KEY];
+        if (Array.isArray(cached) && cached.length > 0) {
+          setCachedNotifications(cached as DynamicNotification[]);
+          return;
+        }
+        // Cache henuz dolmadiysa (SW yeni init, fetch tamamlanmadi),
+        // dogrudan bundled lists/notifications.json'i okuyup state'e
+        // koy. Boylece kullanici reload sonrasi anlik bildirimi gorur.
+        fetch(chrome.runtime.getURL("lists/notifications.json"))
+          .then((r) => (r.ok ? r.json() : null))
+          .then((feed) => {
+            if (feed && Array.isArray(feed.notifications)) {
+              setCachedNotifications(feed.notifications as DynamicNotification[]);
+              // Storage'a da yaz ki SW fetch'e gerek kalmasin.
+              chrome.storage.local.set({
+                [NOTIFICATIONS_CACHE_STORAGE_KEY]: feed.notifications,
+              });
+            }
+          })
+          .catch(() => {});
+      },
+    );
+  }, []);
+  // Bu popup oturumunda "Kapat" tiklananlar — gecici. Popup kapanip
+  // yeniden acilinca sifirlanir (useState default empty). Boylece:
+  //  - Kapat → bu oturumda zilde badge gitsin ama sonraki popup
+  //    acilisinda yine cikar.
+  //  - Bir daha gösterme → kalici dismiss (storage), bu oturumda da
+  //    gizlemek icin ayni flag setine eklenir.
+  const [softClosedIds, setSoftClosedIds] = useState<string[]>([]);
+  const currentNotification =
+    cachedNotifications.find(
+      (n) => !dismissedNotificationIds.includes(n.id) && !softClosedIds.includes(n.id),
+    ) || null;
+  const hasUnreadUpdate = !!currentNotification;
+  const handleDismissChangelog = () => {
+    if (!currentNotification) return;
+    const updated = [...dismissedNotificationIds, currentNotification.id];
+    setDismissedNotificationIds(updated);
+    chrome.storage.local.set({ [DISMISSED_NOTIFICATION_IDS_STORAGE_KEY]: updated });
+    setSoftClosedIds((prev) => [...prev, currentNotification.id]);
+  };
+  const handleSoftCloseChangelog = () => {
+    if (!currentNotification) return;
+    setSoftClosedIds((prev) => [...prev, currentNotification.id]);
+  };
+
+  // Toplam okunmamis sayisi — zilde gosterilen badge sayisi. Su an sadece
+  // remote changelog'lar bildirim olarak sayilir; kullanici aksiyonlari
+  // (Sayfadan Ayril, Bu Adrese Guven, ayar toggle'lari vs.) bildirim
+  // merkezine artik dusmuyor.
+  const unreadCount = hasUnreadUpdate ? 1 : 0;
   // Durum sekmesindeki Skor-style kart hangi kategori acik (null = hicbiri).
   const [durumSkorFilter, setDurumSkorFilter] = useState<"control" | "threat" | "unknown" | null>(null);
   const handleDurumSkorClick = (filter: "control" | "threat" | "unknown") => {
@@ -103,13 +162,6 @@ export default function App() {
   };
 
   // saveSettings useExtensionSettings hook'una tasindi.
-
-  // Fetch popup stats — re-runs when init becomes ready.
-  useEffect(() => {
-    chrome.runtime.sendMessage({ type: "GET_STATS" }, (response: { stats: ExtensionStats } | null) => {
-      if (response?.stats) setStats(response.stats);
-    });
-  }, [initStatus?.ready]);
 
   useEffect(() => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -133,16 +185,40 @@ export default function App() {
         return;
       }
 
+      // 1) Cached verdict from THIS Chrome session — instant fill so popup
+      //    never flashes "Kontrol ediliyor" when SW was idle/restarted.
+      //    storage.session yasam dongusu tarayici acik oldugu surece korunur,
+      //    SW restart'ina dayanir, browser kapatildiginda silinir. Kullanici
+      //    1 saat ayni sayfada kalsa bile her popup acilisinda anlik verdict
+      //    gosterilir.
+      const cacheKey = `verdict:${currentUrl}`;
+      chrome.storage.session.get([cacheKey], (cache) => {
+        const cached = cache[cacheKey];
+        if (cached && cached.level) {
+          setStatus(cached.level as SecurityStatus);
+          setReasons(cached.reasons || []);
+          setIsWhitelisted((cached.reasons || []).includes(t.reasons.whitelisted));
+        }
+      });
+
+      // 2) Fresh check — her zaman calisir, verdict degistiyse state guncellenir.
       chrome.runtime.sendMessage(
         { type: "CHECK_URL", url: currentUrl },
         (response: ThreatResult | null) => {
           if (!response) {
-            setStatus("unknown");
+            // Yanit gelmediyse cache'i koru — "unknown"a dusurmek yerine
+            // mevcut state'i birak. Sadece hala loading'deysek unknown'a gec.
+            setStatus((prev) => prev === "loading" ? "unknown" : prev);
             return;
           }
-          setStatus(response.level.toLowerCase() as SecurityStatus);
+          const level = response.level.toLowerCase() as SecurityStatus;
+          setStatus(level);
           setReasons(response.reasons || []);
           setIsWhitelisted((response.reasons || []).includes(t.reasons.whitelisted));
+          // Sonraki popup acilisi anlik gostersin diye session cache'e yaz.
+          chrome.storage.session.set({
+            [cacheKey]: { level, reasons: response.reasons || [] },
+          });
         },
       );
 
@@ -309,7 +385,20 @@ export default function App() {
             gap: 10,
           }}
         >
-          <img src="/icons/alparslan_logo.svg" alt="Alparslan" style={{ width: 36, height: 36, borderRadius: 6 }} />
+          <img
+            src="/icons/alparslan_logo.svg"
+            alt="Alparslan"
+            width={36}
+            height={36}
+            decoding="async"
+            loading="eager"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 6,
+              imageRendering: "-webkit-optimize-contrast" as const,
+            }}
+          />
           <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.3, color: "#f8fafc" }}>Alparslan</span>
         </div>
         <div style={{ padding: "32px 24px", textAlign: "center" }}>
@@ -403,15 +492,15 @@ export default function App() {
         onToggleEnabled={handleToggle}
         notificationsOpen={notificationsOpen}
         onToggleNotifications={() => setNotificationsOpen(!notificationsOpen)}
+        unreadCount={unreadCount}
       />
 
       {notificationsOpen && (
         <NotificationPanel
-          infoOpen={infoOpen}
-          setInfoOpen={setInfoOpen}
-          controlCount={history.length}
-          threatCount={history.filter((h) => h.level === "DANGEROUS" || h.level === "SUSPICIOUS").length}
-          unknownCount={history.filter((h) => h.level === "UNKNOWN").length}
+          onClose={() => setNotificationsOpen(false)}
+          notification={hasUnreadUpdate ? currentNotification : null}
+          onDismissNotification={handleDismissChangelog}
+          onSoftCloseNotification={handleSoftCloseChangelog}
           protectedDays={protectedDays}
         />
       )}
@@ -478,59 +567,52 @@ export default function App() {
           title={t.confirmDisableNotif.message}
           body={t.confirmDisableNotif.detail}
         >
-          <button
-            onClick={() => setShowDisableConfirm(false)}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-            style={{
-              width: "100%",
-              padding: "11px 0",
-              background: "var(--accent-success)",
-              color: "white",
-              border: "none",
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              marginBottom: 8,
-              boxShadow: "0 4px 12px rgba(22,163,74,0.3)",
-              transition: "transform 0.15s ease",
-            }}
-          >
-            {t.confirmDisableNotif.keep}
-          </button>
-          <button
-            onClick={() => {
-              saveSettings({ ...settings, showDomWarnings: false });
-              setShowDisableConfirm(false);
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--surface-elevated)";
-              e.currentTarget.style.borderColor = "var(--border-strong)";
-              e.currentTarget.style.transform = "scale(1.02)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.borderColor = "var(--border-strong)";
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-            style={{
-              width: "100%",
-              padding: "10px 0",
-              background: "transparent",
-              border: "1px solid var(--border-strong)",
-              borderRadius: 10,
-              color: "var(--text-muted)",
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              transition: "background 0.15s ease, border-color 0.15s ease, transform 0.15s ease",
-            }}
-          >
-            {t.confirmDisableNotif.disable}
-          </button>
+          <div style={{ display: "flex", gap: 8, maxWidth: 240, margin: "0 auto" }}>
+            <button
+              onClick={() => setShowDisableConfirm(false)}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                background: "var(--accent-navy)",
+                color: "white",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 10.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                boxShadow: "0 2px 5px rgba(30,58,138,0.30)",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              {t.confirmDisableNotif.keep}
+            </button>
+            <button
+              onClick={() => {
+                saveSettings({ ...settings, showDomWarnings: false });
+                setShowDisableConfirm(false);
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                background: "transparent",
+                border: "1px solid var(--border-strong)",
+                borderRadius: 6,
+                color: "var(--text-muted)",
+                fontSize: 10.5,
+                fontWeight: 500,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              {t.confirmDisableNotif.disable}
+            </button>
+          </div>
         </ConfirmModal>
       )}
 
@@ -544,7 +626,7 @@ export default function App() {
           title={t.speechBubble.confirmCloseTitle}
           body={t.speechBubble.confirmCloseBody}
         >
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, maxWidth: 240, margin: "0 auto" }}>
             <button
               onClick={() => {
                 setShowCloseConfirm(false);
@@ -554,16 +636,16 @@ export default function App() {
               onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
               style={{
                 flex: 1,
-                padding: "9px 8px",
-                background: "var(--accent-success)",
+                padding: "6px 10px",
+                background: "var(--accent-danger)",
                 color: "white",
                 border: "none",
-                borderRadius: 9,
-                fontSize: 12,
+                borderRadius: 6,
+                fontSize: 10.5,
                 fontWeight: 700,
                 cursor: "pointer",
                 fontFamily: "inherit",
-                boxShadow: "0 3px 8px rgba(22,163,74,0.35)",
+                boxShadow: "0 2px 5px rgba(220,38,38,0.30)",
                 transition: "transform 0.15s ease",
               }}
             >
@@ -575,12 +657,12 @@ export default function App() {
               onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
               style={{
                 flex: 1,
-                padding: "9px 8px",
+                padding: "6px 10px",
                 background: "transparent",
                 color: "var(--text-muted)",
                 border: "1px solid var(--border-strong)",
-                borderRadius: 9,
-                fontSize: 12,
+                borderRadius: 6,
+                fontSize: 10.5,
                 fontWeight: 500,
                 cursor: "pointer",
                 fontFamily: "inherit",
@@ -594,18 +676,37 @@ export default function App() {
       )}
 
       {/* "Bu Adrese Güven" confirmation — staying away IS the safe move here.
-          Windows/web convention: sol = aksiyon ("Evet, Güven", riskli),
-          sağ = iptal/güvenli ("Vazgeç"). Görsel ağırlık tersine: "Vazgeç"
-          dolgu yeşil (kullanıcının refleks taraf), "Evet, Güven" sade amber
-          outline (riski almak için kullanıcı bilinçli aim atmalı). Sonuç:
-          okuma sağa varır → göz "Vazgeç" üstünde durur, refleks koruma
-          yönünde çalışır. */}
+          Tüm modal'larda tek standart: SOL = Vazgeç (escape), SAG = ana eylem.
+          Renk neyin güvenli/varsayilan oldugunu soyler: riskli modal'larda
+          (trust, clear, disable) yesil dolgu Vazgeç'te (sol), beyaz outline
+          riskli eylemde (sag) — refleks tik korumayi korur. */}
       {showTrustConfirm && (
         <ConfirmModal
           title={t.speechBubble.confirmTrustTitle}
           body={t.speechBubble.confirmTrustBody}
         >
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, maxWidth: 240, margin: "0 auto" }}>
+            <button
+              onClick={() => setShowTrustConfirm(false)}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                background: "var(--accent-navy)",
+                color: "white",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 10.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                boxShadow: "0 2px 5px rgba(30,58,138,0.30)",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              {t.speechBubble.confirmTrustCancel}
+            </button>
             <button
               onClick={() => {
                 setShowTrustConfirm(false);
@@ -615,12 +716,12 @@ export default function App() {
               onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
               style={{
                 flex: 1,
-                padding: "9px 8px",
+                padding: "6px 10px",
                 background: "transparent",
-                color: "var(--accent-warning)",
-                border: "1px solid #fcd34d",
-                borderRadius: 9,
-                fontSize: 12,
+                color: "var(--text-muted)",
+                border: "1px solid var(--border-strong)",
+                borderRadius: 6,
+                fontSize: 10.5,
                 fontWeight: 500,
                 cursor: "pointer",
                 fontFamily: "inherit",
@@ -628,27 +729,6 @@ export default function App() {
               }}
             >
               {t.speechBubble.confirmTrustConfirm}
-            </button>
-            <button
-              onClick={() => setShowTrustConfirm(false)}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-              style={{
-                flex: 1,
-                padding: "9px 8px",
-                background: "var(--accent-success)",
-                color: "white",
-                border: "none",
-                borderRadius: 9,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                boxShadow: "0 3px 8px rgba(22,163,74,0.35)",
-                transition: "transform 0.15s ease",
-              }}
-            >
-              {t.speechBubble.confirmTrustCancel}
             </button>
           </div>
         </ConfirmModal>

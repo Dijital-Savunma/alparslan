@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { DashboardData } from "@/dashboard/types";
-import { type ScanHistoryEntry, type ExtensionSettings, HISTORY_DISPLAY_LIMIT } from "@/utils/types";
+import { type ScanHistoryEntry, HISTORY_DISPLAY_LIMIT } from "@/utils/types";
 import t from "@/i18n/tr";
 import { useCountUp } from "./useCountUp";
 
@@ -17,9 +17,6 @@ export default function DashboardTab() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
-  // Skor Analizi panosunda "Detayli Guvenlik Taramasi" ayarini gostermek
-  // icin ayarlari da cekiyoruz.
-  const [settings, setSettings] = useState<ExtensionSettings | null>(null);
 
   useEffect(() => {
     chrome.runtime.sendMessage(
@@ -33,12 +30,6 @@ export default function DashboardTab() {
     chrome.runtime.sendMessage({ type: "GET_HISTORY" }, (response: { history: ScanHistoryEntry[] } | null) => {
       if (response?.history) setHistory(response.history);
     });
-    chrome.runtime.sendMessage(
-      { type: "GET_SETTINGS" },
-      (response: { settings: ExtensionSettings } | null) => {
-        if (response?.settings) setSettings(response.settings);
-      },
-    );
 
     // Reaktif yenileme — popup acikken arka planda olusan degisiklikleri
     // anlik yansitir:
@@ -55,12 +46,6 @@ export default function DashboardTab() {
           { type: "GET_DASHBOARD_SCORE" },
           (response: { dashboard: DashboardData } | null) => {
             if (response?.dashboard) setDashboard(response.dashboard);
-          },
-        );
-        chrome.runtime.sendMessage(
-          { type: "GET_SETTINGS" },
-          (response: { settings: ExtensionSettings } | null) => {
-            if (response?.settings) setSettings(response.settings);
           },
         );
       }
@@ -170,10 +155,24 @@ export default function DashboardTab() {
 
   return (
     <div style={{ padding: 14, background: "var(--surface)" }}>
-      {/* Title above the ring */}
+      {/* Title above the ring — sag tarafta yardim (?) ikonu hover'da
+          skor hesaplama formulunu gosterir. Statik mesaj, anlik hesaplama
+          icermez; "100 uzerinden tehlikeli -10, supheli -5, guvenli +1"
+          gibi kullanicinin bir bakista anladigi kisa not. */}
       <div style={{ textAlign: "center", marginBottom: 8 }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)", letterSpacing: 0.5 }}>
+        <div
+          style={{
+            fontSize: 15,
+            fontWeight: 800,
+            color: "var(--text)",
+            letterSpacing: 0.5,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
           Günlük Skor
+          <ScoreHelpTooltip />
         </div>
       </div>
 
@@ -364,6 +363,7 @@ export default function DashboardTab() {
                 delta={5}
               />
             )}
+
           </div>
         );
       })()}
@@ -436,7 +436,32 @@ export default function DashboardTab() {
                 Vertical align: line-height=1 + display:flex + alignItems
                 center her iki butonda metni dikeyde tam ortalar (font weight
                 farkindan dogan kayma artik yok). */}
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, maxWidth: 240, margin: "0 auto" }}>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "6px 10px",
+                  background: "var(--accent-navy)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  boxShadow: "0 2px 5px rgba(30,58,138,0.30)",
+                  transition: "transform 0.15s ease",
+                }}
+              >
+                {t.resetScore.confirmCancel}
+              </button>
               <button
                 onClick={() => {
                   setShowResetConfirm(false);
@@ -449,37 +474,12 @@ export default function DashboardTab() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  padding: "10px 8px",
-                  background: "#2563eb",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 9,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  boxShadow: "0 3px 8px rgba(37,99,235,0.30)",
-                  transition: "transform 0.15s ease",
-                }}
-              >
-                {t.resetScore.confirmYes}
-              </button>
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "10px 8px",
+                  padding: "6px 10px",
                   background: "transparent",
                   color: "var(--text-muted)",
                   border: "1px solid var(--border-strong)",
-                  borderRadius: 9,
-                  fontSize: 12,
+                  borderRadius: 6,
+                  fontSize: 10.5,
                   fontWeight: 500,
                   lineHeight: 1,
                   cursor: "pointer",
@@ -487,7 +487,7 @@ export default function DashboardTab() {
                   transition: "transform 0.15s ease",
                 }}
               >
-                {t.resetScore.confirmCancel}
+                {t.resetScore.confirmYes}
               </button>
             </div>
           </div>
@@ -498,6 +498,87 @@ export default function DashboardTab() {
 }
 
 // Skor Analizi panosundaki tek bir aciklama satiri. tone'a gore renk
+// "Günlük Skor" yazisinin yanindaki yardim ikonu — hover'da statik bir
+// not gosterir. Skorun nasil hesaplandigini kisa anlatir; anlik degerler
+// yok, formul bilgisi var. Standart "?" karakter degil, gercek soru-isaretli
+// daire SVG (cogu web sitesinde gorulen tarzda).
+function ScoreHelpTooltip() {
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <span
+        role="button"
+        aria-label="Skor nasıl hesaplanır?"
+        tabIndex={0}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: 999,
+          background: "var(--surface-card)",
+          border: "1.5px solid var(--text-muted)",
+          color: "var(--text-muted)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "help",
+          transition: "all 0.15s ease",
+        }}
+      >
+        {/* "?" karakteri yerine SVG — webde standart yardim ikonu */}
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </span>
+      {open && (
+        <div
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            right: "50%",
+            transform: "translateX(50%)",
+            width: 240,
+            padding: "8px 10px",
+            background: "var(--text)",
+            color: "var(--surface-card)",
+            fontSize: 11,
+            lineHeight: 1.45,
+            fontWeight: 500,
+            borderRadius: 8,
+            boxShadow: "0 8px 18px rgba(0,0,0,0.25)",
+            zIndex: 50,
+            textAlign: "left",
+            letterSpacing: 0,
+          }}
+        >
+          Skor 100 üzerinden hesaplanır. Her bir tehlikeli site <strong>-10</strong>, her bir şüpheli
+          durum <strong>-5</strong>, her bir güvenli site <strong>+1</strong> puandır. Toplam puanınız
+          en fazla 100 olabilir.
+          {/* Tooltip ucu (Dxn'dan asagi bakan ucgen) */}
+          <div
+            style={{
+              position: "absolute",
+              top: -5,
+              right: "50%",
+              transform: "translateX(50%) rotate(45deg)",
+              width: 9,
+              height: 9,
+              background: "var(--text)",
+            }}
+          />
+        </div>
+      )}
+    </span>
+  );
+}
+
 // (warning = kirmizi, success = yesil), opsiyonel delta (puan etkisi) ile
 // sag tarafta pill rozet gosterir. delta verilmezse rozet yerine sadece
 // metin gozukur — "olumlu durum" (tehdit yok / ayar acik) icin kullanilir.

@@ -317,28 +317,14 @@ body { background: var(--surface); color: var(--text); transition: background 0.
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10);
 }
 
-/* Speech-bubble Alparslan logo — one-shot "grow → shake → shrink" reaction
-   on hover. NOT infinite: the animation plays once each time the cursor
-   enters, then settles back to rest scale. */
+/* Speech-bubble Alparslan logo — sade transition, hover'da hicbir
+   animasyon yok. Eskiden wobble (selamlama sallamasi) vardi ama
+   kullanici rahatsiz buldu, kaldirildi. */
 .alparslan-bubble-logo {
   transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.alparslan-bubble-logo:hover {
-  animation: alparslanWobble 0.65s ease-in-out 1;
-}
-@keyframes alparslanWobble {
-  0%   { transform: scale(1)    rotate(0deg); }
-  18%  { transform: scale(1.12) rotate(-8deg); }
-  36%  { transform: scale(1.12) rotate(7deg); }
-  54%  { transform: scale(1.12) rotate(-5deg); }
-  72%  { transform: scale(1.12) rotate(4deg); }
-  85%  { transform: scale(1.08) rotate(0deg); }
-  100% { transform: scale(1)    rotate(0deg); }
-}
 
-/* Mood expressions — looped status-driven animations on the bubble logo. The
-   :hover wobble above overrides these while the cursor is on the logo, then
-   the mood animation resumes when the cursor leaves. */
+/* Mood expressions — looped status-driven animations on the bubble logo. */
 
 /* Safe — gentle nodding "I approve" motion. */
 @keyframes alparslanNod {

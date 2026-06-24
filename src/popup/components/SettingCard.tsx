@@ -16,11 +16,15 @@ export function SettingCard({
   desc,
   enabled,
   onToggle,
+  iconSrc,
 }: {
   title: string;
   desc: string;
   enabled: boolean;
   onToggle: () => void;
+  /** Opsiyonel: title metninden once kucuk bir gorsel ikon goster
+   *  (ornegin Alparslan asistan toggle'i icin alparslan logosu). */
+  iconSrc?: string;
 }) {
   const [justSaved, setJustSaved] = useState(false);
   const handleToggle = () => {
@@ -52,7 +56,30 @@ export function SettingCard({
       }}
     >
       <div>
-        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>{title}</div>
+        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", display: "flex", alignItems: "center", gap: 6 }}>
+          {iconSrc && (
+            <img
+              src={iconSrc}
+              alt=""
+              width={22}
+              height={22}
+              decoding="async"
+              loading="eager"
+              style={{
+                width: 22,
+                height: 22,
+                objectFit: "contain",
+                flexShrink: 0,
+                // SVG'yi kucuk olcekte oksek kalitede render et — eski 18px
+                // boyutta antialias yumuşatmasi bulaniklik yapiyordu, hem
+                // boyutu biraz yukseltip hem image-rendering ipucu vererek
+                // SVG cizgileri keskin kalir.
+                imageRendering: "-webkit-optimize-contrast" as const,
+              }}
+            />
+          )}
+          <span>{title}</span>
+        </div>
         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{desc}</div>
       </div>
       <div

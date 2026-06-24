@@ -96,6 +96,14 @@ Object.defineProperty(globalThis, "chrome", {
       updateDynamicRules: vi.fn().mockResolvedValue(undefined),
       getDynamicRules: vi.fn().mockResolvedValue([]),
     },
+    contextMenus: {
+      create: vi.fn(),
+      removeAll: vi.fn((cb?: () => void) => { cb?.(); }),
+      onClicked: { addListener: vi.fn() },
+    },
+    notifications: {
+      create: vi.fn(),
+    },
   },
   writable: true,
 });

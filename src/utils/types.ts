@@ -35,6 +35,12 @@ export interface ExtensionSettings {
    * language verdict instead of (just) the technical SAFE/SUSPICIOUS labels.
    */
   speechBubbleEnabled: boolean;
+  /**
+   * Sag tik menusu — "Alparslan ile Güvenliği Kontrol Et" secenegi. true ise
+   * background SW context menu kayit eder, false ise removeAll ile temizler.
+   * Toggle anlik etki eder.
+   */
+  contextMenuEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
@@ -47,6 +53,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   showDomWarnings: true,
   darkMode: false,
   speechBubbleEnabled: true,
+  contextMenuEnabled: true,
 };
 
 export interface ExtensionStats {

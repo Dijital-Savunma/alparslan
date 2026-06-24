@@ -16,14 +16,19 @@ test.describe("Popup — Notification Centre", () => {
   test("clicking bell opens the notification panel", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByTitle("Bildirimleri görüntüle").click();
-    await expect(popup.getByText("Bilgilendirme Merkezi")).toBeVisible();
+    // Welcome metni 'bilgilendirme merkezi'ni cumlede gectigi icin
+    // getByText case-insensitive eslesir; butonu rol-bazli locator ile
+    // ayikla (strict-mode violation engellenir).
+    await expect(
+      popup.getByRole("button", { name: /Bilgilendirme Merkezi/ }),
+    ).toBeVisible();
     await popup.close();
   });
 
   test("Bilgilendirme Merkezi button reveals the glossary", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByTitle("Bildirimleri görüntüle").click();
-    await popup.getByText("Bilgilendirme Merkezi").click();
+    await popup.getByRole("button", { name: /Bilgilendirme Merkezi/ }).click();
     // The glossary heading "Kısa Bilgilendirme" should now be visible
     await expect(popup.getByText("Kısa Bilgilendirme")).toBeVisible();
     // And the term definitions should be there
@@ -32,13 +37,13 @@ test.describe("Popup — Notification Centre", () => {
     await popup.close();
   });
 
-  test("cumulative summary shows in notification panel", async ({ context, extensionId }) => {
+  test("protected days badge shows in notification panel", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByTitle("Bildirimleri görüntüle").click();
-    // Welcome line + cumulative summary (passive-voice lines with emoji prefixes)
-    // should both render. The "Şu ana kadar sizin için" prefix was dropped;
-    // we now match on the suffix of each summary line instead.
-    await expect(popup.getByText(/adres kontrol edildi/)).toBeVisible();
+    // Refactor sonrasi panel sade: gunluk sayac satirlari (adres
+    // kontrol edildi / tehlikeli adres bulundu) kaldirildi. Geriye
+    // koruma sureci rozeti + welcome metni + Bilgilendirme Merkezi
+    // butonu kaldi.
     await expect(popup.getByText(/gündür korunuyorsunuz/)).toBeVisible();
     await popup.close();
   });
@@ -46,11 +51,17 @@ test.describe("Popup — Notification Centre", () => {
   test("close button (✕) closes the notification panel", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
     await popup.getByTitle("Bildirimleri görüntüle").click();
-    await expect(popup.getByText("Bilgilendirme Merkezi")).toBeVisible();
-    // After opening, the same button toggles state with title "Bildirimleri kapat"
-    await popup.getByTitle("Bildirimleri kapat").click();
+    const infoButton = popup.getByRole("button", { name: /Bilgilendirme Merkezi/ });
+    await expect(infoButton).toBeVisible();
+    // Panel acikken hem bell (title=Bildirimleri kapat) hem changelog
+    // kart kose (title=Bildirimi kapat) ✕ tasiyor. Panel'in kendi
+    // kapatma butonu = title="Bildirimleri kapat" + icerik ✕.
+    await popup
+      .locator('button[title="Bildirimleri kapat"]')
+      .filter({ hasText: "✕" })
+      .click();
     // Notification panel content gone, status panel visible again
-    await expect(popup.getByText("Bilgilendirme Merkezi")).not.toBeVisible();
+    await expect(infoButton).not.toBeVisible();
     await popup.close();
   });
 });

@@ -209,7 +209,13 @@ export function StatusPanel({
                   <img
                     src="/icons/alparslan_logo.svg"
                     alt="Alparslan"
-                    style={{ width: "78%", height: "78%" }}
+                    decoding="async"
+                    loading="eager"
+                    style={{
+                      width: "78%",
+                      height: "78%",
+                      imageRendering: "-webkit-optimize-contrast" as const,
+                    }}
                   />
                 </div>
 
@@ -335,10 +341,6 @@ export function StatusPanel({
                             lineHeight: 1.2,
                           }}
                         >
-                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
                           {t.speechBubble.actionClose}
                         </button>
                         {!isWhitelisted && (
@@ -399,7 +401,14 @@ export function StatusPanel({
           );
         })() : (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8, width: "100%" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 7, flex: 1, minWidth: 0 }}>
+            {/* Nokta hep title satirinin gorsel merkezi ile hizali kalmali —
+                eski marginTop: -15 hack'i 2-satirli verdict goruntusunde
+                calisiyordu ama displayDomain bos (loading / chrome://)
+                durumlarda noktayi titrin uzerine itiyordu. Cozum:
+                alignItems flex-start + dot'a sabit marginTop: 6 (24px
+                title satir yuksekligi - 10px dot / 2 = ~7), boylece
+                domain olsa da olmasa da hizali. */}
             <span
               style={{
                 animation:
@@ -415,7 +424,7 @@ export function StatusPanel({
                   displayStatus === "safe" ? "#16a34a" :
                   displayStatus === "dangerous" ? "#dc2626" :
                   displayStatus === "suspicious" ? "#d97706" : "#6b7280",
-                marginTop: -15,
+                marginTop: 7,
                 flexShrink: 0,
               }}
             />
@@ -435,7 +444,9 @@ export function StatusPanel({
                   ? <>{t.status.checking.replace(/\.+$/, "")}{loadingDots}</>
                   : config?.label}
               </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{displayDomain}</div>
+              {displayDomain && displayDomain !== "—" && (
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{displayDomain}</div>
+              )}
             </div>
           </div>
 

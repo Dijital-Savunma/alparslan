@@ -104,8 +104,32 @@ export default function Options() {
         />
       </Section>
 
+      {/* Browser tools — sag tik menusu vb. tarayici entegrasyonlari */}
+      <Section title={t.options.browserTools}>
+        <OptionsSettingCard
+          title={t.settings.contextMenu}
+          desc={t.settings.contextMenuDesc}
+          enabled={settings.contextMenuEnabled !== false}
+          onToggle={() =>
+            saveSettings({
+              ...settings,
+              contextMenuEnabled: !(settings.contextMenuEnabled !== false),
+            })
+          }
+        />
+      </Section>
+
       {/* Whitelist */}
       <Section title={t.options.whitelist}>
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+            padding: 16,
+          }}
+        >
         <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>
           {t.options.whitelistDesc}
         </p>
@@ -213,6 +237,7 @@ export default function Options() {
             ))}
           </div>
         )}
+        </div>
       </Section>
 
       {/* Clear Data */}
@@ -268,55 +293,52 @@ export default function Options() {
           title={t.confirmDisableNotif.message}
           body={t.confirmDisableNotif.detail}
         >
-          <button
-            onClick={() => setShowDisableNotif(false)}
-            style={{
-              width: "100%",
-              padding: "11px 0",
-              background: "#16a34a",
-              border: "none",
-              borderRadius: 8,
-              color: "white",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              marginBottom: 10,
-            }}
-          >
-            {t.confirmDisableNotif.keep}
-          </button>
-          <button
-            onClick={() => {
-              saveSettings({ ...settings, showDomWarnings: false });
-              setShowDisableNotif(false);
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#f8fafc";
-              e.currentTarget.style.borderColor = "#94a3b8";
-              e.currentTarget.style.transform = "scale(1.02)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.borderColor = "#cbd5e1";
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-            style={{
-              width: "100%",
-              padding: "10px 0",
-              background: "transparent",
-              border: "1px solid #cbd5e1",
-              borderRadius: 10,
-              color: "#6b7280",
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              transition: "background 0.15s ease, border-color 0.15s ease, transform 0.15s ease",
-            }}
-          >
-            {t.confirmDisableNotif.disable}
-          </button>
+          <div style={{ display: "flex", gap: 8, maxWidth: 280, margin: "0 auto" }}>
+            <button
+              onClick={() => setShowDisableNotif(false)}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                background: "#1e3a8a",
+                border: "none",
+                borderRadius: 6,
+                color: "white",
+                fontSize: 10.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                boxShadow: "0 2px 5px rgba(30,58,138,0.30)",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              {t.confirmDisableNotif.keep}
+            </button>
+            <button
+              onClick={() => {
+                saveSettings({ ...settings, showDomWarnings: false });
+                setShowDisableNotif(false);
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                color: "#374151",
+                fontSize: 10.5,
+                fontWeight: 500,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              {t.confirmDisableNotif.disable}
+            </button>
+          </div>
         </ConfirmModal>
       )}
 
@@ -331,43 +353,50 @@ export default function Options() {
               bastigi icin niyetlenen eylem buradadir — kirmizi dolgu net),
               sag = guvenli iptal (gri, kayitlari tutar). Goz okuma sonunda
               sagda durur; isteyen aksiyona sol-tarafa bilincli yonelir. */}
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 8, maxWidth: 280, margin: "0 auto" }}>
+            <button
+              onClick={() => setShowClearConfirm(false)}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                background: "#1e3a8a",
+                border: "none",
+                borderRadius: 6,
+                color: "white",
+                fontSize: 10.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                boxShadow: "0 2px 5px rgba(30,58,138,0.30)",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              {t.confirmClearData.cancel}
+            </button>
             <button
               onClick={() => {
                 handleClearData();
                 setShowClearConfirm(false);
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
               style={{
                 flex: 1,
-                padding: "10px 0",
-                background: "#dc2626",
-                border: "none",
-                borderRadius: 8,
-                color: "white",
-                fontSize: 13,
-                fontWeight: 700,
+                padding: "6px 10px",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                color: "#374151",
+                fontSize: 10.5,
+                fontWeight: 500,
                 cursor: "pointer",
                 fontFamily: "inherit",
+                transition: "transform 0.15s ease",
               }}
             >
               {t.confirmClearData.confirm}
-            </button>
-            <button
-              onClick={() => setShowClearConfirm(false)}
-              style={{
-                flex: 1,
-                padding: "10px 0",
-                background: "#f3f4f6",
-                border: "1px solid #e5e7eb",
-                borderRadius: 8,
-                color: "#374151",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              {t.confirmClearData.cancel}
             </button>
           </div>
         </ConfirmModal>

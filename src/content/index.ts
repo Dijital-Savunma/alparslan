@@ -179,12 +179,12 @@ function createBreachInfoBanner(reason: string, domain: string): void {
     ".confirm-backdrop.open .confirm-card { transform: scale(1); }",
     ".confirm-title { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 10px; }",
     ".confirm-body { font-size: 13px; line-height: 1.55; color: #64748b; margin: 0 0 20px; }",
-    ".confirm-actions { display: flex; gap: 8px; }",
-    ".confirm-btn { flex: 1; padding: 10px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }",
-    ".confirm-btn.primary { background: #2563eb; color: #ffffff; border: none; box-shadow: 0 3px 8px rgba(37, 99, 235, 0.30); }",
-    ".confirm-btn.primary:hover { background: #1d4ed8; transform: scale(1.03); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.40); }",
-    ".confirm-btn.muted { background: transparent; color: #64748b; border: 1px solid #cbd5e1; }",
-    ".confirm-btn.muted:hover { background: #f1f5f9; color: #1e293b; border-color: #94a3b8; transform: scale(1.03); }",
+    ".confirm-actions { display: flex; gap: 8px; max-width: 280px; margin: 0 auto; }",
+    ".confirm-btn { flex: 1; padding: 6px 12px; border-radius: 6px; font-size: 10.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }",
+    ".confirm-btn.primary { background: #16a34a; color: #ffffff; border: none; box-shadow: 0 2px 5px rgba(22, 163, 74, 0.30); }",
+    ".confirm-btn.primary:hover { background: #15803d; transform: scale(1.03); box-shadow: 0 3px 8px rgba(22, 163, 74, 0.40); }",
+    ".confirm-btn.muted { background: #ffffff; color: #374151; border: 1px solid #e5e7eb; font-weight: 500; }",
+    ".confirm-btn.muted:hover { background: #f9fafb; border-color: #cbd5e1; transform: scale(1.03); }",
   ].join(" ");
   shadow.appendChild(style);
 

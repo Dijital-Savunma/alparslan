@@ -63,6 +63,7 @@ export function SettingsTab({
       <SettingCard
         title={t.settings.speechBubble}
         desc={t.settings.speechBubbleDesc}
+        iconSrc="/icons/alparslan_logo.svg"
         enabled={settings.speechBubbleEnabled !== false}
         onToggle={() =>
           saveSettings({

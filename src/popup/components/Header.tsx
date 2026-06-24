@@ -17,11 +17,14 @@ export function Header({
   onToggleEnabled,
   notificationsOpen,
   onToggleNotifications,
+  unreadCount,
 }: {
   enabled: boolean;
   onToggleEnabled: (newEnabled: boolean) => void;
   notificationsOpen: boolean;
   onToggleNotifications: () => void;
+  /** Toplam okunmamis bildirim sayisi — remote changelog'lardan. */
+  unreadCount: number;
 }) {
   return (
     <div
@@ -41,7 +44,7 @@ export function Header({
           büyür/parlar, yazı maviye döner. */}
       <button
         type="button"
-        onClick={() => chrome.tabs.create({ url: "https://dijitalsavunma.org/" })}
+        onClick={() => chrome.tabs.create({ url: "https://alparslan.dijitalsavunma.org/" })}
         title="Dijital Savunma sitesine git"
         aria-label="Dijital Savunma sitesine git"
         onMouseEnter={(e) => {
@@ -71,10 +74,11 @@ export function Header({
           }
         }}
         style={{
+          // flex:1 kaldirildi — hover alani logo+yazi genisliginde kalsin.
+          // Bell ve toggle marginLeft: auto ile saga itilir.
           display: "flex",
           alignItems: "center",
           gap: 10,
-          flex: 1,
           background: "transparent",
           border: "none",
           padding: 0,
@@ -86,11 +90,18 @@ export function Header({
         <img
           src="/icons/alparslan_logo.svg"
           alt=""
+          width={36}
+          height={36}
+          decoding="async"
+          loading="eager"
           style={{
             width: 36,
             height: 36,
             borderRadius: 6,
             transition: "all 0.15s ease",
+            // SVG'yi keskin kalmasi icin — eski 36px boyutta antialias
+            // yumusatmasi nedeniyle hafif bulanik gorunuyordu.
+            imageRendering: "-webkit-optimize-contrast" as const,
           }}
         />
         <span
@@ -107,43 +118,69 @@ export function Header({
         </span>
       </button>
 
-      {/* Bildirim çekmecesi butonu — açıkken ✕, kapalıyken 🔔 */}
+      {/* Bildirim cekmecesi butonu — sadece 🔔 ikonu, halka/cerceve yok.
+          Acik durumda zil sari/parlak vurgu alir (drop-shadow glow), kapali
+          durumda sade gorunur. Tekrar basinca panel kapanir; X butonu da
+          panelin sag ust kosesinde duruyor. */}
       <button
         onClick={onToggleNotifications}
         title={notificationsOpen ? t.notificationCenter.close : t.notificationCenter.open}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = notificationsOpen
-            ? "rgba(248, 250, 252, 0.22)"
-            : "rgba(96, 165, 250, 0.18)";
-          e.currentTarget.style.transform = "translateY(-1px) scale(1.05)";
+          e.currentTarget.style.transform = "translateY(-1px) scale(1.10)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = notificationsOpen
-            ? "rgba(248, 250, 252, 0.12)"
-            : "rgba(255, 255, 255, 0.08)";
           e.currentTarget.style.transform = "translateY(0) scale(1)";
         }}
         style={{
+          marginLeft: "auto",
           width: 30,
           height: 30,
-          borderRadius: 999,
-          border: notificationsOpen
-            ? "1px solid rgba(248, 250, 252, 0.55)"
-            : "1px solid rgba(191, 219, 254, 0.35)",
-          background: notificationsOpen ? "rgba(248, 250, 252, 0.12)" : "rgba(255, 255, 255, 0.08)",
-          color: notificationsOpen ? "#e2e8f0" : "#bfdbfe",
+          border: "none",
+          background: "transparent",
+          padding: 0,
           cursor: "pointer",
-          fontSize: notificationsOpen ? 18 : 14,
-          fontWeight: notificationsOpen ? 500 : 400,
+          fontSize: 15,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontFamily: "inherit",
-          transition: "all 0.2s ease",
-          boxShadow: notificationsOpen ? "0 0 10px rgba(148, 163, 184, 0.35)" : "none",
+          transition: "transform 0.2s ease, filter 0.2s ease",
+          filter: notificationsOpen
+            ? "drop-shadow(0 0 6px rgba(253, 224, 71, 0.85))"
+            : "none",
+          position: "relative",
         }}
       >
-        {notificationsOpen ? "✕" : "🔔"}
+        🔔
+        {/* Kirmizi rozet — okunmamis bildirim sayisini gosterir. 0 ise
+            hic render olmaz. 9'dan fazlaysa "9+" gosterir (kotu UX'i
+            engelle: tek karakter kalsin). */}
+        {unreadCount > 0 && (
+          <span
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              minWidth: 14,
+              height: 14,
+              padding: "0 3px",
+              borderRadius: 999,
+              background: "#dc2626",
+              color: "white",
+              fontSize: 9,
+              fontWeight: 700,
+              fontFamily: "system-ui, -apple-system, sans-serif",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 0 0 2px var(--accent-navy)",
+              lineHeight: 1,
+              pointerEvents: "none",
+            }}
+          >
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
       </button>
 
       {/* "Aktif/Pasif" toggle — yeşil glow on, gray off */}

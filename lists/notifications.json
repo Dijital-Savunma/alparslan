@@ -1,0 +1,16 @@
+{
+  "version": "2026-06-24-r2",
+  "notifications": [
+    {
+      "id": "v0.5.0-release",
+      "title": "Alparslan güncellendi!",
+      "lines": [
+        "Popup arayüzü tamamen yenilendi — onay pencereleri, bildirim çekmecesi ve skor sekmesi daha temiz",
+        "Ayarlar sayfası daha az kalabalık",
+        "Sağ Tık Güvenlik Kontrolü: herhangi bir sayfada sağ tıklayıp \"Alparslan ile Güvenliği Kontrol Et\" diyebilirsiniz; Tüm Ayarlar > Tarayıcı Araçları kısmından aç/kapatabilirsiniz",
+        "Yeni güncelleme bildirimleri: değişiklikleri artık burada göreceksiniz"
+      ],
+      "publishedAt": "2026-06-19"
+    }
+  ]
+}

@@ -126,9 +126,10 @@ const tr = {
     dangerWarningsDesc: "Tehlikeli sitelerde uyarı göster",
     darkMode: "🌙 Karanlık Mod",
     darkModeDesc: "Koyu renk teması",
-    speechBubble: "🤖 Alparslan Asistan",
+    speechBubble: "Alparslan Asistan",
     speechBubbleDesc: "Güvenlik durumlarını teknik terimlerle değil; Alparslan'ın bir asistan gibi sizinle konuşarak, kolay ve sade cümlelerle anlatmasını sağlar.",
-    blacklistCount: (n: number) => `Engellediğim Bağlantılar: ${n} domain`,
+    contextMenu: "🖱️ Sağ Tık Güvenlik Kontrolü",
+    contextMenuDesc: "Herhangi bir sayfada sağ tıkladığınızda menüde \"Alparslan ile Güvenliği Kontrol Et\" seçeneği çıkar. Tıklayınca sayfa arka planda kontrol edilir; sonuç sağ alttan kısa bir bildirimle gösterilir ve bildirim merkezine de düşer.",
     whitelistCount: (n: number) => `Güvendiğim Bağlantılar: ${n} domain`,
     allSettings: "Tüm Ayarlar",
   },
@@ -147,15 +148,6 @@ const tr = {
     detail: "Bu işlem geri alınamaz. Alparslan'ın bugüne kadar kontrol ettiği tüm adres verileri ve istatistikler tamamen silinecektir.",
     cancel: "Vazgeç, Kayıtları Tut",
     confirm: "Evet, Hepsini Temizle",
-  },
-
-  // --- Popup ag izleme ---
-  networkStats: {
-    title: "Bu Sayfa - Ağ İzleme",
-    request: "İstek",
-    domain: "Domain",
-    threat: "Tehdit",
-    blocked: "Engellenen",
   },
 
   // --- Popup gecmis ---
@@ -245,7 +237,7 @@ const tr = {
     confirmCloseTitle: "Bu sayfayı kapatmak istediğinizden emin misiniz?",
     confirmCloseBody:
       "Onayladığınız an Alparslan bu tehlikeli sekmeyi tamamen sonlandıracaktır. Güvenliğiniz için bu sayfadaki tüm işlemleriniz durdurulur.",
-    confirmCloseConfirm: "Sekmeyi Kapat",
+    confirmCloseConfirm: "Sayfadan Ayrıl",
     confirmCloseCancel: "Vazgeç",
   },
 
@@ -262,13 +254,7 @@ const tr = {
     infoButton: "Bilgilendirme Merkezi",
     infoButtonHide: "Bilgilendirmeyi gizle",
     infoTitle: "Kısa Bilgilendirme",
-    welcome: "Ben Alparslan sizi korumak için buradayım! ",
-    welcomeLink: "Buraya",
-    welcomeLinkTitle: "Dijital Savunma sitesine git",
-    welcomeSuffix: " tıklayarak benimle ilgili bilgilere ulaşabilirsiniz.",
-    todayChecked: " adres kontrol edildi.",
-    todayThreats: " tehlikeli adres bulundu.",
-    todayUnknowns: " şüpheli durum tespit edildi.",
+    welcome: "Ben Alparslan, sizi siber tehditlere karşı korumak için buradayım! Sistem kullanımı, güvenlik ipuçları ve merak ettiğiniz bilgilere aşağıdaki bilgilendirme merkezinden ulaşabilirsiniz.",
     protectedDays: (n: number) => `${n} gündür korunuyorsunuz`,
     glossary: {
       controlLabel: "Kontrol",
@@ -283,8 +269,6 @@ const tr = {
       scoreRangeBad: "0 – 49",
       whitelistLabel: "Güvendiğim Bağlantılar",
       whitelistDesc: "Güvenilir olduğunu bildiğiniz siteleri eklediğiniz alandır. Bu siteler güvenli kabul edilir. Güvendiğiniz bağlantılara ayarlar kısmından ulaşabilirsiniz.",
-      blacklistLabel: "Engellediğim Bağlantılar",
-      blacklistDesc: "Riskli veya engellenmesini istediğiniz sitelerin tutulduğu listedir.",
       threatLabel: "Tehlikeli Adresler",
       threatDesc: "Zararlı, sahte veya kullanıcı güvenliğini riske atan, tuzak amaçlı kurulmuş adresleri ifade eder.",
       unknownLabel: "Şüpheli Durumlar",
@@ -450,15 +434,9 @@ const tr = {
   options: {
     title: "Alparslan Ayarlar",
     subtitle: "Güvenlik ve gizlilik tercihlerinizi yönetin",
-    weeklySummary: "Haftalık Güvenlik Özeti",
     settingsSaved: "Ayarlar kaydedildi",
-    protectionLevel: "Koruma Seviyesi",
     notifications: "Bildirimler",
-    threatNotifications: "Tehdit Bildirimleri",
-    threatNotificationsDesc: "Tehlikeli site tespit edildiğinde bildirim göster",
-    networkMonitoring: "Ağ İzleme",
-    networkListenLabel: "Network İsteklerini Dinle",
-    networkListenDesc: "Tüm ağ isteklerini izleyerek tehditleri tespit eder",
+    browserTools: "Tarayıcı Araçları",
     whitelist: "Güvendiğim Bağlantılar",
     whitelistDesc: "Bu listedeki siteler için koruma devre dışı bırakılır",
     whitelistPlaceholder: "İstisna tutulacak web adresini girin...",
@@ -467,16 +445,6 @@ const tr = {
     clearAll: "Tüm Verileri Temizle",
     cleared: "Veriler temizlendi",
     clearDesc: "Tüm ayarlar ve güvendiğiniz bağlantılar sıfırlanır",
-  },
-
-  // --- Koruma seviyeleri ---
-  protection: {
-    low: "Düşük",
-    lowDesc: "Sadece bilinen tehlikeli siteleri engeller",
-    medium: "Orta",
-    mediumDesc: "Tehlikeli siteler + şüpheli URL tespiti",
-    high: "Yüksek",
-    highDesc: "Tüm kontroller aktif, agresif koruma",
   },
 
   // --- Init progress ---
@@ -491,8 +459,6 @@ const tr = {
     ready: "Hazır",
   },
 
-  // --- Skor mesajlari ---
-  weeklyStats: (count: number) => `Bu hafta ${count} sayfa kontrol edildi`,
 } as const;
 
 export default tr;
