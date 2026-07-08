@@ -82,9 +82,6 @@ export function StatusPanel({
         style={{
           padding: "18px 6px",
           background: config?.bg || "rgba(107, 114, 128, 0.05)",
-          // Alt cizgi — durumun rengiyle solgun (alpha 88 = ~%53).
-          // color hex olmali (var(--) alpha eklenemez); STATUS_CONFIG
-          // hepsi hex'e cevrildi. loading (config=null) fallback: nötr gri.
           borderBottom: `2px solid ${config?.color ? config.color + "88" : "rgba(148, 163, 184, 0.55)"}`,
           position: "relative",
         }}

@@ -4,66 +4,16 @@
 import { test, expect } from "../fixtures/extension";
 import { openPopup } from "../helpers/extension-page";
 
-test.describe("Popup — Notification Centre", () => {
-  test("bell button is visible in the header", async ({ context, extensionId }) => {
-    const popup = await openPopup(context, extensionId);
-    // Title attribute carries the localized hint; matching by title is
-    // resilient to icon font / emoji rendering differences across OSes.
-    await expect(popup.getByTitle("Bildirimleri görüntüle")).toBeVisible();
-    await popup.close();
-  });
-
-  test("clicking bell opens the notification panel", async ({ context, extensionId }) => {
-    const popup = await openPopup(context, extensionId);
-    await popup.getByTitle("Bildirimleri görüntüle").click();
-    // Welcome metni 'bilgilendirme merkezi'ni cumlede gectigi icin
-    // getByText case-insensitive eslesir; butonu rol-bazli locator ile
-    // ayikla (strict-mode violation engellenir).
-    await expect(
-      popup.getByRole("button", { name: /Bilgilendirme Merkezi/ }),
-    ).toBeVisible();
-    await popup.close();
-  });
-
-  test("Bilgilendirme Merkezi button reveals the glossary", async ({ context, extensionId }) => {
-    const popup = await openPopup(context, extensionId);
-    await popup.getByTitle("Bildirimleri görüntüle").click();
-    await popup.getByRole("button", { name: /Bilgilendirme Merkezi/ }).click();
-    // The glossary heading "Kısa Bilgilendirme" should now be visible
-    await expect(popup.getByText("Kısa Bilgilendirme")).toBeVisible();
-    // And the term definitions should be there
-    await expect(popup.getByText(/Kontrol:/)).toBeVisible();
-    await expect(popup.getByText(/Skor:/)).toBeVisible();
-    await popup.close();
-  });
-
-  test("protected days badge shows in notification panel", async ({ context, extensionId }) => {
-    const popup = await openPopup(context, extensionId);
-    await popup.getByTitle("Bildirimleri görüntüle").click();
-    // Refactor sonrasi panel sade: gunluk sayac satirlari (adres
-    // kontrol edildi / tehlikeli adres bulundu) kaldirildi. Geriye
-    // koruma sureci rozeti + welcome metni + Bilgilendirme Merkezi
-    // butonu kaldi.
-    await expect(popup.getByText(/gündür korunuyorsunuz/)).toBeVisible();
-    await popup.close();
-  });
-
-  test("close button (✕) closes the notification panel", async ({ context, extensionId }) => {
-    const popup = await openPopup(context, extensionId);
-    await popup.getByTitle("Bildirimleri görüntüle").click();
-    const infoButton = popup.getByRole("button", { name: /Bilgilendirme Merkezi/ });
-    await expect(infoButton).toBeVisible();
-    // Panel acikken hem bell (title=Bildirimleri kapat) hem changelog
-    // kart kose (title=Bildirimi kapat) ✕ tasiyor. Panel'in kendi
-    // kapatma butonu = title="Bildirimleri kapat" + icerik ✕.
-    await popup
-      .locator('button[title="Bildirimleri kapat"]')
-      .filter({ hasText: "✕" })
-      .click();
-    // Notification panel content gone, status panel visible again
-    await expect(infoButton).not.toBeVisible();
-    await popup.close();
-  });
+// Notification Centre (bell butonu + panel) tamamen kaldirildi — bell
+// altyapisi silindi, "Bilgilendirme" Options sayfasinda ayri bir sekme
+// olarak yasiyor. Panel'e bagli tum e2e testler skip'e alindi ve
+// bilgilendirme icerigi Options seviyesinde ayrica dogrulaniyor.
+test.describe.skip("Popup — Notification Centre (removed)", () => {
+  test("bell button is visible in the header", async () => {});
+  test("clicking bell opens the notification panel", async () => {});
+  test("Bilgilendirme Merkezi button reveals the glossary", async () => {});
+  test("protected days badge shows in notification panel", async () => {});
+  test("close button (✕) closes the notification panel", async () => {});
 });
 
 // NOTE: The quick-whitelist button visibility is gated on the popup having a
