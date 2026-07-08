@@ -4,6 +4,23 @@ import t from "@/i18n/tr";
 import { SkorCountButton, SkorFilteredList } from "../DashboardTab";
 
 /**
+ * Durum sekmesindeki sayac kartlari + acilan filtreli listelerin
+ * paylastigi TEK kaynak. Hem SkorCountButton'a variant prop'u burdan
+ * gecer hem SkorFilteredList aciilis renklerini burdan okur. Boylece
+ * kart ile listenin arka plani birebir ayni CSS token'a bakar.
+ */
+export type SkorFilter = "control" | "threat" | "unknown";
+export type SkorVariant = "neutral" | "danger" | "info";
+// Kontrol Gecmisi → info (mavi); Bilinmeyen Adresler → neutral (gri).
+// Speech bubble UNKNOWN durumu icin de "neutral" kullanildigindan
+// bubble ve buton ayni gri paletinde: gorsel tutarlilik.
+export function filterToVariant(filter: SkorFilter): SkorVariant {
+  if (filter === "threat") return "danger";
+  if (filter === "unknown") return "neutral";
+  return "info";
+}
+
+/**
  * Sayac karti altina acilan listelerin acilis/kapanis animasyonunu
  * hayata gecirir.
  *
@@ -66,14 +83,13 @@ export function DurumSkorCards({
   const unknownCount = history.filter((h) => h.level === "UNKNOWN").length;
 
   return (
-    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ padding: "14px 6px", display: "flex", flexDirection: "column", justifyContent: "center", flex: 1, gap: 6 }}>
       <SkorCountButton
-        icon="🔍"
         label={t.skorCards.control}
         activeLabel={t.skorCards.controlClose}
         zeroText={t.skorCards.controlZero}
         value={controlCount}
-        variant="neutral"
+        variant={filterToVariant("control")}
         active={durumSkorFilter === "control"}
         onClick={() => onSkorClick("control")}
         title={t.skorCards.controlTooltip}
@@ -84,12 +100,11 @@ export function DurumSkorCards({
       </CollapsibleListSection>
 
       <SkorCountButton
-        icon="🚨"
         label={t.skorCards.threat}
         activeLabel={t.skorCards.threatClose}
         zeroText={t.skorCards.threatZero}
         value={threatCount}
-        variant="danger"
+        variant={filterToVariant("threat")}
         active={durumSkorFilter === "threat"}
         onClick={() => onSkorClick("threat")}
         title={t.skorCards.threatTooltip}
@@ -100,12 +115,11 @@ export function DurumSkorCards({
       </CollapsibleListSection>
 
       <SkorCountButton
-        icon="❔"
         label={t.skorCards.unknown}
         activeLabel={t.skorCards.unknownClose}
         zeroText={t.skorCards.unknownZero}
         value={unknownCount}
-        variant="info"
+        variant={filterToVariant("unknown")}
         active={durumSkorFilter === "unknown"}
         onClick={() => onSkorClick("unknown")}
         title={t.skorCards.unknownTooltip}

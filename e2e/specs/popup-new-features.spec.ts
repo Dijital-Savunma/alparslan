@@ -72,26 +72,19 @@ test.describe("Popup — Notification Centre", () => {
 // presence check here is flaky. The underlying normalisation + membership
 // logic is covered by tests/popup/whitelist-helpers.test.ts (34 cases).
 
-test.describe("Popup — Settings tab whitelist management", () => {
-  test("Settings tab shows the inline whitelist management card", async ({ context, extensionId }) => {
+test.describe("Popup — Ayarlar sekmesi kaldirildi, header'da gear ikonu", () => {
+  test("Ayarlar sekmesi popup'ta yok — sadece Durum + Skor", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
-    await popup.getByText("Ayarlar").click();
-    // Refactor sonrasi "Beyaz Liste" yeniden adlandirildi: "Güvendiğim Bağlantılar"
-    // (yesil ✓ ikonu ile). Subtitle ve input/buton hala ayni.
-    await expect(popup.getByText("Güvendiğim Bağlantılar").first()).toBeVisible();
-    await expect(
-      popup.getByText("Bu listedeki siteler güvenli kabul edilir"),
-    ).toBeVisible();
-    // Input placeholder + Ekle button
-    await expect(popup.getByPlaceholder(/İstisna tutulacak/)).toBeVisible();
-    await expect(popup.getByRole("button", { name: "Ekle" })).toBeVisible();
+    await expect(popup.getByRole("button", { name: "Durum" })).toBeVisible();
+    await expect(popup.getByRole("button", { name: "Skor" })).toBeVisible();
+    await expect(popup.getByRole("button", { name: "Ayarlar" })).toHaveCount(0);
     await popup.close();
   });
 
-  test("Tüm Ayarlar button (with cog emoji) is visible", async ({ context, extensionId }) => {
+  test("Header'da 'Tüm Ayarlar' gear ikonu gorunur", async ({ context, extensionId }) => {
     const popup = await openPopup(context, extensionId);
-    await popup.getByText("Ayarlar").click();
-    await expect(popup.getByRole("button", { name: /Tüm Ayarlar/ })).toBeVisible();
+    // Gear butonu native <button title="Tüm Ayarlar"> — Options sayfasini acar
+    await expect(popup.getByTitle("Tüm Ayarlar")).toBeVisible();
     await popup.close();
   });
 });

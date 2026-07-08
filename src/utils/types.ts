@@ -20,10 +20,26 @@ export interface BlocklistEntry {
   source: string;
 }
 
+/**
+ * Guvendigim baglantilar (whitelist) icin ek meta. `whitelist: string[]`
+ * ana kaynak olarak kalir — hicbir eski kullanim etkilenmez. Yeni bir
+ * domain eklenirken, o an ki verdict (SAFE / SUSPICIOUS / DANGEROUS /
+ * UNKNOWN) burada da tutulur. Boylece Options listesinde her satirda
+ * "onceden ne idi → simdi Guvenli" band'i gosterilebilir.
+ *
+ * Eski (v0.4.0 oncesi eklenen) kayitlar icin meta olmayabilir; UI o durumda
+ * previousLevel'i UNKNOWN olarak varsayar.
+ */
+export interface WhitelistMeta {
+  previousLevel: ThreatLevel;
+  addedAt: number;
+}
+
 export interface ExtensionSettings {
   protectionLevel: "low" | "medium" | "high";
   notificationsEnabled: boolean;
   whitelist: string[];
+  whitelistMeta?: Record<string, WhitelistMeta>;
   networkMonitoringEnabled: boolean;
   networkBlockingEnabled: boolean;
   urlCacheTtlMinutes: number;

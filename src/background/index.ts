@@ -5,7 +5,6 @@ import type { PageAnalysisResult } from "@/detector/page-analyzer";
 import { checkUrlConfirmed, extractDomain } from "@/detector/url-checker";
 import { fetchRemoteBlocklist, scheduleListUpdates } from "@/blocklist/updater";
 import { initUsomBlocklist, scheduleUsomUpdates } from "@/blocklist/usom-updater";
-import { fetchAndCacheNotifications } from "@/notifications/dynamic-notifications";
 import { initWhitelist, scheduleWhitelistUpdates, getDynamicWhitelistSize } from "@/blocklist/whitelist-updater";
 import { checkBreach, loadBreachDatabase as loadBreachDB, initBreachCache } from "@/breach/checker";
 import { collectCurrentWeekMetrics, collectPreviousWeekMetrics, recordPageProtocol, recordThreatVisit, recordTrackerBlocked } from "@/dashboard/metrics-collector";
@@ -423,18 +422,6 @@ chrome.runtime.onInstalled.addListener(() => {
   scheduleWhitelistUpdates();
   scheduleListUpdates();
   fetchRemoteBlocklist();
-
-  // Dinamik bildirimleri uzaktan cek + 6 saatte bir tazele. Boylece
-  // release yapmadan kullanicilara yeni bildirim atilabilir — repodaki
-  // lists/notifications.json'i guncellemek yeterli, jsDelivr CDN ~12
-  // saatte herkese yayar.
-  fetchAndCacheNotifications().catch(() => {});
-  chrome.alarms.create("notifications-refresh", { periodInMinutes: 360 });
-  chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === "notifications-refresh") {
-      fetchAndCacheNotifications().catch((err) => logger.warn("Notifications refresh error:", err));
-    }
-  });
 
   // Sag tik menusu — ayar acikken (default) link/sayfa/secime "Alparslan
   // ile Guvenligi Kontrol Et" secenegi gosterir. Toggle anlik etki etsin

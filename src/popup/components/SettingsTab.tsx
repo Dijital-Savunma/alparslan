@@ -184,31 +184,45 @@ export function SettingsTab({
               background: "var(--surface-card)",
             }}
           />
-          <button
-            onClick={handleAddWhitelistEntry}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--accent-info-deep)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "var(--accent-info)";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-            style={{
-              border: "none",
-              background: "var(--accent-info)",
-              color: "white",
-              borderRadius: 9,
-              padding: "8px 11px",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              transition: "all 0.15s ease",
-            }}
-          >
-            {t.add}
-          </button>
+          {(() => {
+            // Input bos / sadece whitespace iken buton sonuc dogurmaz
+            // (handleAddWhitelistEntry zaten normalizeDomain ile bos
+            // domain'i filtreliyor). Kullanici bilsin diye sonuk + cursor
+            // not-allowed gosterilir; icerik girince mavi dolguya doner.
+            const disabled = popupWhitelistInput.trim().length === 0;
+            return (
+              <button
+                onClick={handleAddWhitelistEntry}
+                disabled={disabled}
+                title={disabled ? "Öncelikle bir web adresi girmeniz gerekiyor" : undefined}
+                onMouseEnter={(e) => {
+                  if (disabled) return;
+                  e.currentTarget.style.background = "var(--accent-info-deep)";
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={(e) => {
+                  if (disabled) return;
+                  e.currentTarget.style.background = "var(--accent-info)";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+                style={{
+                  border: "none",
+                  background: disabled ? "#cbd5e1" : "var(--accent-info)",
+                  color: disabled ? "#64748b" : "white",
+                  borderRadius: 9,
+                  padding: "8px 11px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                  transition: "all 0.15s ease",
+                  opacity: disabled ? 0.7 : 1,
+                }}
+              >
+                {t.add}
+              </button>
+            );
+          })()}
         </div>
 
         <button

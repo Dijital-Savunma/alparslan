@@ -122,13 +122,13 @@ const tr = {
     networkMonitoringDesc: "Sitelerin arkasına gizlenmiş tüm tehlikeleri yakalar.",
     domWarnings: "Sayfa Uyarıları",
     domWarningsDesc: "Tehlikeli sitelerde uyarı göster",
-    dangerWarnings: "🚨 Tehlike Uyarıları",
+    dangerWarnings: "Tehlike Uyarıları",
     dangerWarningsDesc: "Tehlikeli sitelerde uyarı göster",
-    darkMode: "🌙 Karanlık Mod",
-    darkModeDesc: "Koyu renk teması",
+    darkMode: "Karanlık Mod",
+    darkModeDesc: "Alparslan popup ekranını koyu renk temasına çevirir",
     speechBubble: "Alparslan Asistan",
     speechBubbleDesc: "Güvenlik durumlarını teknik terimlerle değil; Alparslan'ın bir asistan gibi sizinle konuşarak, kolay ve sade cümlelerle anlatmasını sağlar.",
-    contextMenu: "🖱️ Sağ Tık Güvenlik Kontrolü",
+    contextMenu: "Sağ Tık Güvenlik Kontrolü",
     contextMenuDesc: "Herhangi bir sayfada sağ tıkladığınızda menüde \"Alparslan ile Güvenliği Kontrol Et\" seçeneği çıkar. Tıklayınca sayfa arka planda kontrol edilir; sonuç sağ alttan kısa bir bildirimle gösterilir ve bildirim merkezine de düşer.",
     whitelistCount: (n: number) => `Güvendiğim Bağlantılar: ${n} domain`,
     allSettings: "Tüm Ayarlar",
@@ -166,9 +166,9 @@ const tr = {
     // Skor sekmesindeki acilabilir listelerin baslik metinleri.
     controlList: "Kontrol Listesi",
     threatList: "Tehlikeli Adres Listesi",
-    unknownList: "Şüpheli Durum Listesi",
+    unknownList: "Bilinmeyen Adres Listesi",
     threatEmpty: "Tehlikeli adres bulunamadı",
-    unknownEmpty: "Şüpheli durum bulunamadı",
+    unknownEmpty: "Bilinmeyen adres bulunamadı",
   },
 
   // --- Popup "guvendigim baglantilar" hizli ekleme ---
@@ -209,9 +209,12 @@ const tr = {
     // separate element in the popup so subsequent wrapped lines align with
     // the first character of text instead of the bubble's edge.
     safe: (domain: string) => `${domain} sayfası Alparslan tarafından güvenli bulundu. Her şey tamamen temiz görünüyor, iyi gezintiler!`,
-    suspicious: (domain: string) => `${domain} sayfasında bazı şüpheli durumlar seziyorum. Sizi yanıltmaya çalışıyor olabilirler. Şifrelerinizi girerken çok dikkatli olun! ⚠️`,
-    dangerous: (domain: string) => `Durun! ${domain} adresinin sahte ve tehlikeli bir tuzak olduğu tespit edildi. Güvenliğiniz için bu sayfayı hemen kapatın! 🛑`,
+    suspicious: (domain: string) => `${domain} sayfasında bazı şüpheli durumlar seziyorum. Sizi yanıltmaya çalışıyor olabilirler. Şifrelerinizi girerken çok dikkatli olun!`,
+    dangerous: (domain: string) => `Durun! ${domain} adresinin sahte ve tehlikeli bir tuzak olduğu tespit edildi. Güvenliğiniz için bu sayfayı hemen kapatın!`,
     unknown: (domain: string) => `${domain} sayfasını ilk defa görüyorum. Bilinen bir tehdit kaydı bulunamadı ancak siz yine de işlemlerinizi yaparken tedbirli olun.`,
+    // Extension'in kendi ic sayfalari (Ayarlar, Bilgilendirme, Popup) icin
+    // "Bu sayfa sayfasini..." tekrari olmasin diye siteName'siz varyant.
+    unknownGeneric: `Bu sayfayı ilk defa görüyorum. Bilinen bir tehdit kaydı bulunamadı ancak siz yine de işlemlerinizi yaparken tedbirli olun.`,
     // Shown when the SAFE verdict comes from the user's own whitelist — we
     // didn't scan it, they vouched for it, so we acknowledge that instead of
     // claiming we scanned it. Keep the "iyi gezintiler" keyword: StatusPanel
@@ -247,20 +250,17 @@ const tr = {
     enable: "Korumayı etkinleştirmek için tıklayınız",
   },
 
-  // --- Popup bilgilendirme merkezi ---
+  // --- Options bilgilendirme sekmesi ---
+  // Sadece glossary alanlari kullaniliyor (kavram sozlugu). Eski
+  // "notification center" cekmecesi kaldirildigi icin geri kalan
+  // string'ler (welcome / infoButton / open / close / protectedDays)
+  // temizlendi.
   notificationCenter: {
-    open: "Bildirimleri görüntüle",
-    close: "Bildirimleri kapat",
-    infoButton: "Bilgilendirme Merkezi",
-    infoButtonHide: "Bilgilendirmeyi gizle",
-    infoTitle: "Kısa Bilgilendirme",
-    welcome: "Ben Alparslan, sizi siber tehditlere karşı korumak için buradayım! Sistem kullanımı, güvenlik ipuçları ve merak ettiğiniz bilgilere aşağıdaki bilgilendirme merkezinden ulaşabilirsiniz.",
-    protectedDays: (n: number) => `${n} gündür korunuyorsunuz`,
     glossary: {
       controlLabel: "Kontrol",
       controlDesc: "Eklentinin ziyaret ettiğiniz sayfadaki bağlantıları, istekleri ve alan adlarını güvenlik açısından incelemesini ifade eder.",
       scoreLabel: "Skor",
-      scoreDesc1: "Haftalık güvenlik skorunu gösterir. ",
+      scoreDesc1: "Günlük güvenlik skorunu gösterir. ",
       scoreDesc2: " güvenli, ",
       scoreDesc3: " orta seviye, ",
       scoreDesc4: " riskli seviye olarak değerlendirilir.",
@@ -271,8 +271,8 @@ const tr = {
       whitelistDesc: "Güvenilir olduğunu bildiğiniz siteleri eklediğiniz alandır. Bu siteler güvenli kabul edilir. Güvendiğiniz bağlantılara ayarlar kısmından ulaşabilirsiniz.",
       threatLabel: "Tehlikeli Adresler",
       threatDesc: "Zararlı, sahte veya kullanıcı güvenliğini riske atan, tuzak amaçlı kurulmuş adresleri ifade eder.",
-      unknownLabel: "Şüpheli Durumlar",
-      unknownDesc: "Sistemin kesin olarak güvenli veya tehlikeli olarak sınıflandıramadığı, sayfa veya adres üzerinde dikkat çeken işaretler gözlenen siteleri gösterir. İsterseniz bu siteleri ayarlar kısmından güvendiğiniz bağlantılara ekleyebilirsiniz.",
+      unknownLabel: "Bilinmeyen Adresler",
+      unknownDesc: "Sistemin güvenli ya da tehlikeli olarak sınıflandıramadığı, hakkında yeterli veri bulunmayan siteleri gösterir. İsterseniz bu siteleri ayarlar kısmından güvendiğiniz bağlantılara ekleyebilirsiniz.",
     },
   },
 
@@ -309,11 +309,11 @@ const tr = {
     threatClose: "Tehlikeli Adres Listesini Kapat",
     threatTooltip: "Tehlikeli adres listesini görmek için tıklayın",
     threatTooltipClose: "Tehlikeli adres listesini kapatmak için tıklayın",
-    unknown: "Şüpheli Durumlar",
-    unknownZero: "Şüpheli durum tespit edilmedi",
-    unknownClose: "Şüpheli Durum Listesini Kapat",
-    unknownTooltip: "Şüpheli durum listesini görmek için tıklayın",
-    unknownTooltipClose: "Şüpheli durum listesini kapatmak için tıklayın",
+    unknown: "Bilinmeyen Adresler",
+    unknownZero: "Bilinmeyen adres tespit edilmedi",
+    unknownClose: "Bilinmeyen Adres Listesini Kapat",
+    unknownTooltip: "Bilinmeyen adres listesini görmek için tıklayın",
+    unknownTooltipClose: "Bilinmeyen adres listesini kapatmak için tıklayın",
   },
 
   // --- Skor halkasi altinda gosterilen dinamik analiz ozetleri ---
@@ -326,10 +326,10 @@ const tr = {
     safeActive: (count: number) =>
       `${count} farklı güvenli sitede gezindiniz.`,
     safeClean: "Henüz güvenli ziyaret kaydı yok.",
-    threatActive: (count: number) => `${count} adet tehlikeli adres tespit edildi.`,
+    threatActive: (count: number) => `${count} farklı tehlikeli adres tespit edildi.`,
     threatClean: "Tehlikeli adres bulunmadı",
     riskActive: (count: number) =>
-      `${count} adet şüpheli durum tespit edildi.`,
+      `${count} farklı şüpheli durum tespit edildi.`,
     riskClean: "Şüpheli durum bulunmadı",
     pointSuffix: "Puan",
   },
@@ -339,7 +339,7 @@ const tr = {
     button: "Skoru sıfırla",
     confirmTitle: "🔄 Günlük skoru sıfırlamak istediğinizden emin misiniz?",
     confirmBody:
-      "Skorunuz 100'e dönecek ve bugünkü tüm verileriniz (Kontrol Geçmişi, Tehlikeli Adresler ve Şüpheli Durumlar) temizlenecektir. Genel ayarlarınız ve güvendiğiniz bağlantılar bu işlemden etkilenmez.",
+      "Skorunuz 100'e dönecek ve bugünkü tüm verileriniz (Kontrol Geçmişi, Tehlikeli Adresler ve Bilinmeyen Adresler) temizlenecektir. Genel ayarlarınız ve güvendiğiniz bağlantılar bu işlemden etkilenmez.",
     confirmYes: "Evet, Sıfırla",
     confirmCancel: "Vazgeç",
   },
@@ -436,6 +436,7 @@ const tr = {
     subtitle: "Güvenlik ve gizlilik tercihlerinizi yönetin",
     settingsSaved: "Ayarlar kaydedildi",
     notifications: "Bildirimler",
+    personalization: "Kişiselleştirme",
     browserTools: "Tarayıcı Araçları",
     whitelist: "Güvendiğim Bağlantılar",
     whitelistDesc: "Bu listedeki siteler için koruma devre dışı bırakılır",

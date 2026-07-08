@@ -18,6 +18,16 @@ export function initIntroScreen(): void {
 
   if (!introScreen || !root || !introActivateBtn) return;
 
+  // Intro overlay React app boot'undan ONCE gorunur — main.tsx'te
+  // uygulanacak data-theme henuz set edilmemis olur. Karanlik mod
+  // ayari kullaniciysa, intro dogrudan karanlik acilsin diye burada
+  // storage'dan okuyup body.dataset.theme'e yazariz (idempotent).
+  chrome.storage.sync.get(["settings"], (result) => {
+    const settings = result.settings || {};
+    if (settings.darkMode === true) document.body.dataset.theme = "dark";
+    else if (settings.darkMode === false) document.body.dataset.theme = "light";
+  });
+
   // Suppresses re-checks while the activation handshake is in flight, so the
   // intro doesn't flicker between states before the storage write commits.
   let ignoreStateCheckUntil = 0;
@@ -55,6 +65,149 @@ export function initIntroScreen(): void {
   }
 
   updateIntroVisibility();
+
+  // Intro logosuna sürükle-döndür 3D animasyonu ekler.
+  // StatusPanel'deki DraggableLogo ile ayni: yatay hareket rotateY,
+  // dikey hareket rotateX; birakinca momentum'la döner, sürtünmeyle söner.
+  // Logo artik button'un DISINDA — tiklama korumayi aktive etmez.
+  if (introLogo) {
+    let rotationX = 0;
+    let rotationY = 0;
+    let isDragging = false;
+    let dragState: {
+      startX: number;
+      startY: number;
+      startRotationX: number;
+      startRotationY: number;
+      lastX: number;
+      lastY: number;
+      lastTime: number;
+      velocityX: number;
+      velocityY: number;
+    } | null = null;
+    let animRaf: number | null = null;
+    let mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
+    let mouseUpHandler: (() => void) | null = null;
+
+    const applyTransform = (scale = 1) => {
+      const t = `rotateX(${rotationX}deg) rotateY(${rotationY}deg) scale(${scale})`;
+      (introLogo as HTMLElement).style.transform = t;
+    };
+
+    const stopAnim = () => {
+      if (animRaf !== null) {
+        cancelAnimationFrame(animRaf);
+        animRaf = null;
+      }
+    };
+
+    // [-180, 180] araligina indir. rotate(350deg) ile rotate(-10deg) ekranda
+    // ozdes; boylece spring-back kisa yolu izleyip tam donusler yapmaz.
+    const wrapAngle = (a: number) => (((a + 180) % 360) + 360) % 360 - 180;
+
+    // Momentum bittiginde otomatik olarak spring-back'e devrolur:
+    // birakildigi acida takilmaz, yavas yavas 0'a doner.
+    const runSpringBack = () => {
+      rotationX = wrapAngle(rotationX);
+      rotationY = wrapAngle(rotationY);
+      const step = () => {
+        rotationX *= 0.88;
+        rotationY *= 0.88;
+        applyTransform(1);
+        if (Math.abs(rotationX) > 0.3 || Math.abs(rotationY) > 0.3) {
+          animRaf = requestAnimationFrame(step);
+        } else {
+          rotationX = 0;
+          rotationY = 0;
+          applyTransform(1);
+          animRaf = null;
+        }
+      };
+      animRaf = requestAnimationFrame(step);
+    };
+
+    const runMomentum = (vx: number, vy: number) => {
+      const step = () => {
+        vx *= 0.94;
+        vy *= 0.94;
+        rotationY += vx;
+        rotationX -= vy;
+        applyTransform(1);
+        if (Math.abs(vx) > 0.05 || Math.abs(vy) > 0.05) {
+          animRaf = requestAnimationFrame(step);
+        } else {
+          animRaf = null;
+          runSpringBack();
+        }
+      };
+      animRaf = requestAnimationFrame(step);
+    };
+
+    introLogo.addEventListener("mousedown", (e: MouseEvent) => {
+      e.preventDefault();
+      stopAnim();
+      isDragging = true;
+      introLogo.classList.add("dragging");
+      const now = performance.now();
+      dragState = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startRotationX: rotationX,
+        startRotationY: rotationY,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        lastTime: now,
+        velocityX: 0,
+        velocityY: 0,
+      };
+      applyTransform(1.06);
+
+      mouseMoveHandler = (ev: MouseEvent) => {
+        if (!isDragging || !dragState) return;
+        const dx = ev.clientX - dragState.startX;
+        const dy = ev.clientY - dragState.startY;
+        rotationY = dragState.startRotationY + dx;
+        rotationX = dragState.startRotationX - dy;
+        const t = performance.now();
+        const dt = t - dragState.lastTime;
+        if (dt > 0) {
+          const instVx = ev.clientX - dragState.lastX;
+          const instVy = ev.clientY - dragState.lastY;
+          dragState.velocityX = dragState.velocityX * 0.3 + instVx * 0.7;
+          dragState.velocityY = dragState.velocityY * 0.3 + instVy * 0.7;
+        }
+        dragState.lastX = ev.clientX;
+        dragState.lastY = ev.clientY;
+        dragState.lastTime = t;
+        applyTransform(1.06);
+      };
+
+      mouseUpHandler = () => {
+        if (!isDragging || !dragState) return;
+        isDragging = false;
+        introLogo.classList.remove("dragging");
+        const vx = dragState.velocityX;
+        const vy = dragState.velocityY;
+        dragState = null;
+        applyTransform(1);
+        if (mouseMoveHandler) window.removeEventListener("mousemove", mouseMoveHandler);
+        if (mouseUpHandler) window.removeEventListener("mouseup", mouseUpHandler);
+        mouseMoveHandler = null;
+        mouseUpHandler = null;
+        if (Math.abs(vx) > 0.5 || Math.abs(vy) > 0.5) {
+          runMomentum(vx, vy);
+        } else {
+          runSpringBack();
+        }
+      };
+
+      window.addEventListener("mousemove", mouseMoveHandler);
+      window.addEventListener("mouseup", mouseUpHandler);
+    });
+
+    // Tarayici resim surukleme davranisini engelle (gorsel bozulmasin).
+    introLogo.addEventListener("dragstart", (e) => e.preventDefault());
+  }
 
   introActivateBtn.addEventListener("click", () => {
     introActivateBtn.disabled = true;

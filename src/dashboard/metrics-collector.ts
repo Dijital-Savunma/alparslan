@@ -1,13 +1,18 @@
 import { EMPTY_WEEKLY_METRICS, type WeeklyMetrics } from "./types";
 
+/**
+ * Bir zaman damgasi icin AKTIF PERIYOT baslangicini (UTC gun basi) doner.
+ * Metrikler artik GUNLUK bazli sifirlaniyor — kullanici popup'ta "Gunluk
+ * Skor" gorurken kod tarafi da gunluk bir periyodu takip eder.
+ *
+ * Fonksiyon adi geriye donuk uyumluluk icin `getWeekStart` kaldi
+ * (storage key'leri weeklyMetrics/previousWeekMetrics degismesin —
+ * eski kullanicilar veriyi kaybetmesin), ancak icerik gun basidir.
+ */
 export function getWeekStart(timestamp: number): number {
-  const date = new Date(timestamp);
-  const day = date.getUTCDay();
-  const diff = day === 0 ? 6 : day - 1;
-  const monday = new Date(date);
-  monday.setUTCDate(date.getUTCDate() - diff);
-  monday.setUTCHours(0, 0, 0, 0);
-  return monday.getTime();
+  const dayStart = new Date(timestamp);
+  dayStart.setUTCHours(0, 0, 0, 0);
+  return dayStart.getTime();
 }
 
 function getStoredMetrics(): Promise<{ current: WeeklyMetrics; previous: WeeklyMetrics | null }> {

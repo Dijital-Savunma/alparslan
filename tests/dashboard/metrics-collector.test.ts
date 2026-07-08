@@ -3,30 +3,25 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getWeekStart, collectCurrentWeekMetrics, recordPageProtocol, recordThreatVisit } from "@/dashboard/metrics-collector";
 import { EMPTY_WEEKLY_METRICS } from "@/dashboard/types";
 
-describe("getWeekStart", () => {
-  it("returns Monday 00:00:00 for a Wednesday", () => {
+// getWeekStart adi backward-compat icin duruyor ama artik GUNLUK
+// gun-basi doner ("Gunluk Skor" tarafiyla ayni periyot).
+describe("getWeekStart (daily day-start)", () => {
+  it("returns 00:00:00 UTC of the same day for a mid-afternoon input", () => {
     const wed = new Date("2026-03-25T14:30:00Z").getTime();
-    const weekStart = getWeekStart(wed);
-    const date = new Date(weekStart);
-    expect(date.getUTCDay()).toBe(1);
-    expect(date.getUTCHours()).toBe(0);
-    expect(date.getUTCMinutes()).toBe(0);
+    const dayStart = getWeekStart(wed);
+    expect(new Date(dayStart).toISOString()).toBe("2026-03-25T00:00:00.000Z");
   });
 
-  it("returns same Monday for a Monday input", () => {
-    const mon = new Date("2026-03-23T10:00:00Z").getTime();
-    const weekStart = getWeekStart(mon);
-    const date = new Date(weekStart);
-    expect(date.getUTCDay()).toBe(1);
-    expect(date.toISOString().startsWith("2026-03-23")).toBe(true);
+  it("returns same instant when input is already at day start", () => {
+    const mon = new Date("2026-03-23T00:00:00Z").getTime();
+    const dayStart = getWeekStart(mon);
+    expect(new Date(dayStart).toISOString()).toBe("2026-03-23T00:00:00.000Z");
   });
 
-  it("returns previous Monday for a Sunday", () => {
+  it("returns start of the same Sunday for a Sunday evening", () => {
     const sun = new Date("2026-03-29T20:00:00Z").getTime();
-    const weekStart = getWeekStart(sun);
-    const date = new Date(weekStart);
-    expect(date.getUTCDay()).toBe(1);
-    expect(date.toISOString().startsWith("2026-03-23")).toBe(true);
+    const dayStart = getWeekStart(sun);
+    expect(new Date(dayStart).toISOString()).toBe("2026-03-29T00:00:00.000Z");
   });
 });
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { type ThreatResult, type ExtensionSettings } from "@/utils/types";
+import { type ThreatResult, type ExtensionSettings, ThreatLevel } from "@/utils/types";
 import TabBar, { type TabId } from "./TabBar";
 import DashboardTab from "./DashboardTab";
 import BreachBadge from "./BreachBadge";
@@ -8,19 +8,10 @@ import { useInitProgress, useSmoothPercent } from "./hooks/useInitProgress";
 import { useExtensionEnabled } from "./hooks/useExtensionEnabled";
 import { useScanHistory } from "./hooks/useScanHistory";
 import { useExtensionSettings } from "./hooks/useExtensionSettings";
-import { useProtectedDays } from "./hooks/useProtectedDays";
-import { NotificationPanel } from "./components/NotificationPanel";
-import { SettingsTab } from "./components/SettingsTab";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Header } from "./components/Header";
-import { Footer } from "./components/Footer";
 import { DurumSkorCards } from "./components/DurumSkorCards";
 import { StatusPanel, useLoadingDots } from "./components/StatusPanel";
-import {
-  type DynamicNotification,
-  NOTIFICATIONS_CACHE_STORAGE_KEY,
-  DISMISSED_NOTIFICATION_IDS_STORAGE_KEY,
-} from "@/notifications/dynamic-notifications";
 import t from "@/i18n/tr";
 
 export type SecurityStatus = "safe" | "dangerous" | "suspicious" | "unknown" | "loading" | "disabled";
@@ -30,11 +21,11 @@ export type SecurityStatus = "safe" | "dangerous" | "suspicious" | "unknown" | "
 // solid pastels (#f0fdf4 etc.) looked great on white but turned into a
 // blown-out fog patch over the dark popup background.
 const STATUS_CONFIG: Record<Exclude<SecurityStatus, "loading">, { label: string; color: string; bg: string }> = {
-  safe: { label: t.status.safe, color: "#16a34a", bg: "rgba(22, 163, 74, 0.10)" },
-  dangerous: { label: t.status.dangerous, color: "#dc2626", bg: "rgba(220, 38, 38, 0.10)" },
-  suspicious: { label: t.status.suspicious, color: "#d97706", bg: "rgba(217, 119, 6, 0.10)" },
-  unknown: { label: t.status.unknown, color: "var(--text-muted)", bg: "rgba(107, 114, 128, 0.10)" },
-  disabled: { label: t.status.disabled, color: "#9ca3af", bg: "rgba(156, 163, 175, 0.10)" },
+  safe: { label: t.status.safe, color: "#16a34a", bg: "var(--status-safe-panel)" },
+  dangerous: { label: t.status.dangerous, color: "#dc2626", bg: "var(--status-danger-panel)" },
+  suspicious: { label: t.status.suspicious, color: "#d97706", bg: "var(--status-warning-panel)" },
+  unknown: { label: t.status.unknown, color: "#64748b", bg: "var(--status-unknown-panel)" },
+  disabled: { label: t.status.disabled, color: "#9ca3af", bg: "var(--status-disabled-panel)" },
 };
 
 // InitStatus interface'i ve init polling mantigi src/popup/hooks/useInitProgress.ts
@@ -71,7 +62,7 @@ export default function App() {
   const [url, setUrl] = useState<string>("");
   const [status, setStatus] = useState<SecurityStatus>("loading");
   // Enabled toggle + storage senkron mantigi useExtensionEnabled hook'unda.
-  const { enabled, toggleEnabled } = useExtensionEnabled();
+  const { enabled } = useExtensionEnabled();
   const [reasons, setReasons] = useState<string[]>([]);
   // Tarama gecmisi (history) yukleme + reaktif senkron mantigi
   // useScanHistory hook'unda. clearLocalHistory hook ustunden gelir.
@@ -79,11 +70,8 @@ export default function App() {
   const [pageReasons, setPageReasons] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<TabId>("status");
   // Settings yukleme + reaktif senkron useExtensionSettings hook'una tasindi.
-  const { settings, setSettings, saveSettings } = useExtensionSettings();
+  const { settings, saveSettings } = useExtensionSettings();
   const [isWhitelisted, setIsWhitelisted] = useState<boolean>(false);
-  const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
-  // Koruma süresi hesabi (gun) useProtectedDays hook'unda.
-  const protectedDays = useProtectedDays();
   const [popupWhitelistInput, setPopupWhitelistInput] = useState<string>("");
   const [showDisableConfirm, setShowDisableConfirm] = useState<boolean>(false);
   // Speech-bubble action confirmation gates — both verdicts run through a
@@ -91,72 +79,10 @@ export default function App() {
   // click.
   const [showCloseConfirm, setShowCloseConfirm] = useState<boolean>(false);
   const [showTrustConfirm, setShowTrustConfirm] = useState<boolean>(false);
-  // Dinamik bildirim state'i — popup mount'unda chrome.storage.local'dan
-  // hem cache'lenmis bildirimler hem kullanicinin kalici dismiss ettigi
-  // id'ler okunur. Kullaniciya gosterilecek aktif bildirim = ilk
-  // unread olan (cache sirasi = JSON sirasi).
-  const [cachedNotifications, setCachedNotifications] = useState<DynamicNotification[]>([]);
-  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([]);
-  useEffect(() => {
-    chrome.storage.local.get(
-      [NOTIFICATIONS_CACHE_STORAGE_KEY, DISMISSED_NOTIFICATION_IDS_STORAGE_KEY],
-      (result) => {
-        const dismissed = result[DISMISSED_NOTIFICATION_IDS_STORAGE_KEY];
-        if (Array.isArray(dismissed)) setDismissedNotificationIds(dismissed as string[]);
-        const cached = result[NOTIFICATIONS_CACHE_STORAGE_KEY];
-        if (Array.isArray(cached) && cached.length > 0) {
-          setCachedNotifications(cached as DynamicNotification[]);
-          return;
-        }
-        // Cache henuz dolmadiysa (SW yeni init, fetch tamamlanmadi),
-        // dogrudan bundled lists/notifications.json'i okuyup state'e
-        // koy. Boylece kullanici reload sonrasi anlik bildirimi gorur.
-        fetch(chrome.runtime.getURL("lists/notifications.json"))
-          .then((r) => (r.ok ? r.json() : null))
-          .then((feed) => {
-            if (feed && Array.isArray(feed.notifications)) {
-              setCachedNotifications(feed.notifications as DynamicNotification[]);
-              // Storage'a da yaz ki SW fetch'e gerek kalmasin.
-              chrome.storage.local.set({
-                [NOTIFICATIONS_CACHE_STORAGE_KEY]: feed.notifications,
-              });
-            }
-          })
-          .catch(() => {});
-      },
-    );
-  }, []);
-  // Bu popup oturumunda "Kapat" tiklananlar — gecici. Popup kapanip
-  // yeniden acilinca sifirlanir (useState default empty). Boylece:
-  //  - Kapat → bu oturumda zilde badge gitsin ama sonraki popup
-  //    acilisinda yine cikar.
-  //  - Bir daha gösterme → kalici dismiss (storage), bu oturumda da
-  //    gizlemek icin ayni flag setine eklenir.
-  const [softClosedIds, setSoftClosedIds] = useState<string[]>([]);
-  const currentNotification =
-    cachedNotifications.find(
-      (n) => !dismissedNotificationIds.includes(n.id) && !softClosedIds.includes(n.id),
-    ) || null;
-  const hasUnreadUpdate = !!currentNotification;
-  const handleDismissChangelog = () => {
-    if (!currentNotification) return;
-    const updated = [...dismissedNotificationIds, currentNotification.id];
-    setDismissedNotificationIds(updated);
-    chrome.storage.local.set({ [DISMISSED_NOTIFICATION_IDS_STORAGE_KEY]: updated });
-    setSoftClosedIds((prev) => [...prev, currentNotification.id]);
-  };
-  const handleSoftCloseChangelog = () => {
-    if (!currentNotification) return;
-    setSoftClosedIds((prev) => [...prev, currentNotification.id]);
-  };
-
-  // Toplam okunmamis sayisi — zilde gosterilen badge sayisi. Su an sadece
-  // remote changelog'lar bildirim olarak sayilir; kullanici aksiyonlari
-  // (Sayfadan Ayril, Bu Adrese Guven, ayar toggle'lari vs.) bildirim
-  // merkezine artik dusmuyor.
-  const unreadCount = hasUnreadUpdate ? 1 : 0;
   // Durum sekmesindeki Skor-style kart hangi kategori acik (null = hicbiri).
   const [durumSkorFilter, setDurumSkorFilter] = useState<"control" | "threat" | "unknown" | null>(null);
+  // Ayni butona tekrar tiklaninca cekmece kapanir; farkli bir butona
+  // tiklaninca aktif filtre yeni butona gecer.
   const handleDurumSkorClick = (filter: "control" | "threat" | "unknown") => {
     setDurumSkorFilter((prev) => (prev === filter ? null : filter));
   };
@@ -173,13 +99,27 @@ export default function App() {
         return;
       }
 
-      if (!currentUrl || currentUrl.startsWith("chrome://") || currentUrl.startsWith("about:")) {
+      // Tarayici / extension iç sayfalari — kullanicinin ziyareti sayilmaz,
+      // "Bilinmeyen" olarak istatistige yazilmaz. Extension'in kendi
+      // options / popup / bilgilendirme sayfalarinda popup acilinca extension
+      // ID'si domain gibi gorunuyordu; artik "Bu sayfa" fallback ile temiz.
+      const isInternalUrl =
+        !currentUrl ||
+        currentUrl.startsWith("chrome://") ||
+        currentUrl.startsWith("about:") ||
+        currentUrl.startsWith("edge://") ||
+        currentUrl.startsWith("chrome-extension://") ||
+        currentUrl.startsWith("moz-extension://");
+      if (isInternalUrl) {
         setStatus("unknown");
-        // Tell the background to record this as a "Bilinmeyen" visit so the
-        // counter on the stats row matches the status displayed above it.
-        // (Background dedupes against the most recent entry to avoid spam
-        // when the popup is reopened on the same internal page.)
-        if (currentUrl) {
+        // chrome:// gibi tarayici sayfalarini "bilinmeyen ziyaret" olarak
+        // sayaca yaziyorduk — extension URL'sini bu listeye eklerken
+        // istatistige de yansimasini istemedik (kendi sayfamiz).
+        if (
+          currentUrl &&
+          !currentUrl.startsWith("chrome-extension://") &&
+          !currentUrl.startsWith("moz-extension://")
+        ) {
           chrome.runtime.sendMessage({ type: "RECORD_UNKNOWN_VIEW", url: currentUrl });
         }
         return;
@@ -236,11 +176,6 @@ export default function App() {
       } catch { /* ignore */ }
     });
   }, [enabled, initStatus?.ready]);
-
-  // handleToggle artik useExtensionEnabled hook'unun expose ettigi
-  // toggleEnabled fonksiyonu — alias olarak tutuldu ki diger butonlar
-  // ayni isim uzerinden cagirabilsin.
-  const handleToggle = toggleEnabled;
 
   // History yukleme + reaktif senkron useScanHistory hook'una tasindi.
 
@@ -301,6 +236,14 @@ export default function App() {
   const handleAddToWhitelist = () => {
     const domain = normalizeQuickWhitelistDomain(displayDomain);
     if (!domain || domain === "—") return;
+    // Domain'in whitelist'e eklenmeden ONCEKI verdict'i — Options
+    // listesinde "onceden Supheliydi → simdi Guvenli" bandi icin.
+    // status "loading" olabilir; o durumda UNKNOWN.
+    const priorLevel: ThreatLevel =
+      status === "safe" ? ThreatLevel.SAFE :
+      status === "dangerous" ? ThreatLevel.DANGEROUS :
+      status === "suspicious" ? ThreatLevel.SUSPICIOUS :
+      ThreatLevel.UNKNOWN;
     chrome.storage.sync.get(["settings"], (result) => {
       const current: ExtensionSettings = result.settings || {};
       const list: string[] = current.whitelist || [];
@@ -308,40 +251,19 @@ export default function App() {
         setIsWhitelisted(true);
         return;
       }
-      const updated: ExtensionSettings = { ...current, whitelist: [...list, domain] };
+      const nextMeta = { ...(current.whitelistMeta || {}) };
+      nextMeta[domain] = { previousLevel: priorLevel, addedAt: Date.now() };
+      const updated: ExtensionSettings = {
+        ...current,
+        whitelist: [...list, domain],
+        whitelistMeta: nextMeta,
+      };
       chrome.storage.sync.set({ settings: updated }, () => {
         setIsWhitelisted(true);
         // Update IDB-backed cache used by CHECK_URL.
         chrome.runtime.sendMessage({ type: "ADD_TO_WHITELIST", domain });
         // Propagate settings change so background re-applies (and other
         // popups/options pages refresh their state).
-        chrome.runtime.sendMessage({ type: "SETTINGS_UPDATED", settings: updated });
-      });
-    });
-  };
-
-  const handleViewWhitelist = () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("whitelist.html") });
-  };
-
-  const handleAddWhitelistEntry = () => {
-    const domain = normalizeQuickWhitelistDomain(popupWhitelistInput);
-    if (!domain) return;
-    chrome.storage.sync.get(["settings"], (result) => {
-      const current: ExtensionSettings = result.settings || {};
-      const list: string[] = current.whitelist || [];
-      if (list.includes(domain)) {
-        setPopupWhitelistInput("");
-        return;
-      }
-      const updated: ExtensionSettings = { ...current, whitelist: [...list, domain] };
-      chrome.storage.sync.set({ settings: updated }, () => {
-        setPopupWhitelistInput("");
-        // Local state mirror so the count badge + any other settings-derived
-        // UI (e.g. whitelist length checks) reflect the change instantly
-        // instead of waiting for the storage.onChanged round-trip.
-        setSettings((prev) => prev ? { ...prev, whitelist: updated.whitelist } : updated);
-        chrome.runtime.sendMessage({ type: "ADD_TO_WHITELIST", domain });
         chrome.runtime.sendMessage({ type: "SETTINGS_UPDATED", settings: updated });
       });
     });
@@ -356,7 +278,15 @@ export default function App() {
   const config = displayStatus === "loading" ? null : STATUS_CONFIG[displayStatus];
   const displayDomain = (() => {
     try {
-      return new URL(url).hostname;
+      const parsed = new URL(url);
+      // Extension'in kendi sayfalarinda (options / bilgilendirme / popup)
+      // hostname extension ID (32 karakter random string) olur, bubble
+      // icinde okunmasi zor. "\u2014" dondururuz, siteName otomatik
+      // "Bu sayfa" fallback'ine duser.
+      if (parsed.protocol === "chrome-extension:" || parsed.protocol === "moz-extension:") {
+        return "\u2014";
+      }
+      return parsed.hostname;
     } catch {
       return url || "\u2014";
     }
@@ -372,13 +302,12 @@ export default function App() {
   // yakalarsak hic loader gostermeyelim (sahte climb yok).
   if (loaderVisible && initStatus) {
     return (
-      <div style={{ width: 340, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: 14 }}>
+      <div style={{ width: 340, background: "var(--surface)", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: 14 }}>
         <div
           style={{
             padding: "12px 16px",
             background: "linear-gradient(135deg, var(--accent-navy), var(--accent-navy-deep))",
-            borderBottom: "2px solid var(--accent-info-bright)",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+            borderBottom: "1px solid rgba(148, 163, 184, 0.20)",
             color: "#f8fafc",
             display: "flex",
             alignItems: "center",
@@ -485,78 +414,63 @@ export default function App() {
   }
 
   return (
-    <div style={{ width: 340, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: 14 }}>
+    <div style={{
+      width: 340,
+      background: "var(--surface)",
+      overflowX: "hidden",
+      // Popup SABIT yukseklik. Skor sekmesindeki uzun icerik
+      // alparslan-thin-scroll ile ic tarafta scroll edilir. Tab bar
+      // konumu iki sekme arasi gecerken kaymaz.
+      height: 412,
+      display: "flex",
+      flexDirection: "column",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+      fontSize: 14,
+    }}>
       {/* Header components/Header.tsx'e tasindi */}
-      <Header
-        enabled={enabled}
-        onToggleEnabled={handleToggle}
-        notificationsOpen={notificationsOpen}
-        onToggleNotifications={() => setNotificationsOpen(!notificationsOpen)}
-        unreadCount={unreadCount}
-      />
+      <Header />
 
-      {notificationsOpen && (
-        <NotificationPanel
-          onClose={() => setNotificationsOpen(false)}
-          notification={hasUnreadUpdate ? currentNotification : null}
-          onDismissNotification={handleDismissChangelog}
-          onSoftCloseNotification={handleSoftCloseChangelog}
-          protectedDays={protectedDays}
-        />
+      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {/* Tab icerik — sadece bu container scroll eder; Header ve TabBar
+          sabit kalir (yukarida flex column + flex-shrink varsayilan 1
+          + burda flex:1 = kalan alan). Uzun icerik burada scroll edilir,
+          disari tasip Header'i kaydirmaz. */}
+      {(
+        <div
+          className="alparslan-thin-scroll"
+          style={{ flex: 1, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}
+        >
+          {activeTab === "status" && (
+            <>
+              <StatusPanel
+                config={config}
+                displayStatus={displayStatus}
+                displayDomain={displayDomain}
+                settings={settings}
+                reasons={reasons}
+                pageReasons={pageReasons}
+                isWhitelisted={isWhitelisted}
+                popupWhitelistInput={popupWhitelistInput}
+                setPopupWhitelistInput={setPopupWhitelistInput}
+                setShowCloseConfirm={setShowCloseConfirm}
+                setShowTrustConfirm={setShowTrustConfirm}
+                enabled={enabled}
+              />
+              <BreachBadge domain={displayDomain} />
+              <div style={{ marginTop: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
+                <DurumSkorCards
+                  history={history}
+                  durumSkorFilter={durumSkorFilter}
+                  onSkorClick={handleDurumSkorClick}
+                />
+              </div>
+            </>
+          )}
+          {activeTab === "dashboard" && <DashboardTab />}
+        </div>
       )}
 
-      {!notificationsOpen && <TabBar activeTab={activeTab} onTabChange={setActiveTab} />}
-
-      {!notificationsOpen && (
-      <>
-      {activeTab === "dashboard" ? (
-        <DashboardTab />
-      ) : activeTab === "settings" ? (
-        settings ? (
-          <SettingsTab
-            settings={settings}
-            saveSettings={saveSettings}
-            setShowDisableConfirm={setShowDisableConfirm}
-            displayDomain={displayDomain}
-            displayStatus={displayStatus}
-            popupWhitelistInput={popupWhitelistInput}
-            setPopupWhitelistInput={setPopupWhitelistInput}
-            handleAddWhitelistEntry={handleAddWhitelistEntry}
-            handleViewWhitelist={handleViewWhitelist}
-          />
-        ) : null
-      ) : (
-      <>
-      {/* Status panel components/StatusPanel.tsx'e tasindi */}
-      <StatusPanel
-        config={config}
-        displayStatus={displayStatus}
-        displayDomain={displayDomain}
-        settings={settings}
-        reasons={reasons}
-        pageReasons={pageReasons}
-        isWhitelisted={isWhitelisted}
-        popupWhitelistInput={popupWhitelistInput}
-        setPopupWhitelistInput={setPopupWhitelistInput}
-        setShowCloseConfirm={setShowCloseConfirm}
-        setShowTrustConfirm={setShowTrustConfirm}
-        enabled={enabled}
-      />
-
-      <BreachBadge domain={displayDomain} />
-
-      <DurumSkorCards
-        history={history}
-        durumSkorFilter={durumSkorFilter}
-        onSkorClick={handleDurumSkorClick}
-      />
-
-      </>
-      )}
-      </>
-      )}
-
-      {!notificationsOpen && <Footer />}
 
       {/* Confirmation modal shown when the user tries to turn OFF danger
           warnings. UX: "keep protecting" is a big bright-green button; the
@@ -637,7 +551,7 @@ export default function App() {
               style={{
                 flex: 1,
                 padding: "6px 10px",
-                background: "var(--accent-danger)",
+                background: "var(--accent-navy)",
                 color: "white",
                 border: "none",
                 borderRadius: 6,
@@ -645,7 +559,7 @@ export default function App() {
                 fontWeight: 700,
                 cursor: "pointer",
                 fontFamily: "inherit",
-                boxShadow: "0 2px 5px rgba(220,38,38,0.30)",
+                boxShadow: "0 2px 5px rgba(30,58,138,0.30)",
                 transition: "transform 0.15s ease",
               }}
             >
@@ -736,3 +650,4 @@ export default function App() {
     </div>
   );
 }
+

@@ -1,38 +1,15 @@
-import t from "@/i18n/tr";
-
 /**
  * Popup üst çubuğu: Alparslan logosu + "Alparslan" yazısı (her ikisi
- * dijitalsavunma.org'a yönlendiren tek bir buton) + bildirim çekmecesi
- * butonu (🔔) + "Aktif/Pasif" toggle.
- *
- * A11y: Marka buton'u native <button> (Tab + Enter); toggle native
- * <button role="switch" aria-checked> ile klavye ve screen reader
- * uyumlu.
- *
- * Stateless: tüm interaktif durumlar üst component'tan (App.tsx)
- * prop olarak gelir.
+ * dijitalsavunma.org'a yönlendiren tek bir buton) + Ayarlar (gear).
+ * "Aktif/Pasif" toggle Genel Ayarlar sayfasina tasindi.
  */
-export function Header({
-  enabled,
-  onToggleEnabled,
-  notificationsOpen,
-  onToggleNotifications,
-  unreadCount,
-}: {
-  enabled: boolean;
-  onToggleEnabled: (newEnabled: boolean) => void;
-  notificationsOpen: boolean;
-  onToggleNotifications: () => void;
-  /** Toplam okunmamis bildirim sayisi — remote changelog'lardan. */
-  unreadCount: number;
-}) {
+export function Header() {
   return (
     <div
       style={{
         padding: "12px 16px",
         background: "linear-gradient(135deg, var(--accent-navy), var(--accent-navy-deep))",
-        borderBottom: "2px solid var(--accent-info-bright)",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+        borderBottom: "1px solid rgba(148, 163, 184, 0.20)",
         color: "#f8fafc",
         display: "flex",
         alignItems: "center",
@@ -118,13 +95,12 @@ export function Header({
         </span>
       </button>
 
-      {/* Bildirim cekmecesi butonu — sadece 🔔 ikonu, halka/cerceve yok.
-          Acik durumda zil sari/parlak vurgu alir (drop-shadow glow), kapali
-          durumda sade gorunur. Tekrar basinca panel kapanir; X butonu da
-          panelin sag ust kosesinde duruyor. */}
+      {/* Ayarlar butonu — Tum Ayarlar (options.html) sayfasini yeni
+          sekmede acar. Header'in sag ust kosesinde sade SVG sliders. */}
       <button
-        onClick={onToggleNotifications}
-        title={notificationsOpen ? t.notificationCenter.close : t.notificationCenter.open}
+        onClick={() => chrome.runtime.openOptionsPage()}
+        title="Tüm Ayarlar"
+        aria-label="Tüm Ayarlar"
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "translateY(-1px) scale(1.10)";
         }}
@@ -139,105 +115,38 @@ export function Header({
           background: "transparent",
           padding: 0,
           cursor: "pointer",
-          fontSize: 15,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontFamily: "inherit",
-          transition: "transform 0.2s ease, filter 0.2s ease",
-          filter: notificationsOpen
-            ? "drop-shadow(0 0 6px rgba(253, 224, 71, 0.85))"
-            : "none",
-          position: "relative",
+          transition: "transform 0.25s ease",
+          color: "#f8fafc",
         }}
       >
-        🔔
-        {/* Kirmizi rozet — okunmamis bildirim sayisini gosterir. 0 ise
-            hic render olmaz. 9'dan fazlaysa "9+" gosterir (kotu UX'i
-            engelle: tek karakter kalsin). */}
-        {unreadCount > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              minWidth: 14,
-              height: 14,
-              padding: "0 3px",
-              borderRadius: 999,
-              background: "#dc2626",
-              color: "white",
-              fontSize: 9,
-              fontWeight: 700,
-              fontFamily: "system-ui, -apple-system, sans-serif",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 0 0 2px var(--accent-navy)",
-              lineHeight: 1,
-              pointerEvents: "none",
-            }}
-          >
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
+        <svg
+          width="23"
+          height="23"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="4" y1="6" x2="10" y2="6" />
+          <line x1="14" y1="6" x2="20" y2="6" />
+          <circle cx="12" cy="6" r="2" />
+
+          <line x1="4" y1="12" x2="14" y2="12" />
+          <line x1="18" y1="12" x2="20" y2="12" />
+          <circle cx="16" cy="12" r="2" />
+
+          <line x1="4" y1="18" x2="6" y2="18" />
+          <line x1="10" y1="18" x2="20" y2="18" />
+          <circle cx="8" cy="18" r="2" />
+        </svg>
       </button>
 
-      {/* "Aktif/Pasif" toggle — yeşil glow on, gray off */}
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          cursor: "pointer",
-          fontSize: 12,
-        }}
-      >
-        <span>{enabled ? t.active : t.passive}</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={enabled}
-          aria-label={enabled ? t.protectionToggle.disable : t.protectionToggle.enable}
-          onClick={() => onToggleEnabled(!enabled)}
-          title={enabled ? t.protectionToggle.disable : t.protectionToggle.enable}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-1px) scale(1.05)";
-            e.currentTarget.style.boxShadow = enabled
-              ? "0 0 0 3px rgba(34, 197, 94, 0.25), 0 3px 8px rgba(34, 197, 94, 0.35)"
-              : "0 0 0 3px rgba(255, 255, 255, 0.12), 0 3px 8px rgba(0, 0, 0, 0.25)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0) scale(1)";
-            e.currentTarget.style.boxShadow = "none";
-          }}
-          style={{
-            width: 36,
-            height: 20,
-            borderRadius: 10,
-            background: enabled ? "var(--accent-success-bright)" : "#4b5563",
-            position: "relative",
-            transition: "background 0.2s, transform 0.18s ease, box-shadow 0.18s ease",
-            cursor: "pointer",
-            border: "none",
-            padding: 0,
-            fontFamily: "inherit",
-          }}
-        >
-          <div
-            style={{
-              width: 16,
-              height: 16,
-              borderRadius: 8,
-              background: "white",
-              position: "absolute",
-              top: 2,
-              left: enabled ? 18 : 2,
-              transition: "left 0.2s",
-            }}
-          />
-        </button>
-      </label>
     </div>
   );
 }

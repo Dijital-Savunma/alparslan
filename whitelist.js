@@ -175,6 +175,22 @@ function addDomain() {
   });
 }
 
+// Input bos iken Ekle butonu disabled (CSS sonuk gri + cursor
+// not-allowed) + hover'da yardimci tooltip. Yazdikca/sildikce
+// dinamik guncellenir. Popup SettingsTab'taki ayni davranisla
+// paritede.
+function syncAddBtnState() {
+  const empty = whitelistInput.value.trim().length === 0;
+  addBtn.disabled = empty;
+  if (empty) {
+    addBtn.title = "Öncelikle bir web adresi girmeniz gerekiyor";
+  } else {
+    addBtn.removeAttribute("title");
+  }
+}
+whitelistInput.addEventListener("input", syncAddBtnState);
+syncAddBtnState();
+
 addBtn.addEventListener("click", addDomain);
 
 // Arama yapilinca 1. sayfaya don — eski sayfada filtre edilmis sonuc
