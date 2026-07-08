@@ -63,11 +63,12 @@ test.describe("Options Page — Negative Scenarios", () => {
     await expect(
       options.getByRole("heading", { name: "Güvendiğim Bağlantılar", exact: true }),
     ).toBeVisible({ timeout: 5000 });
-    await expect(options.getByText("Güvendiğiniz bağlantı listesi boş")).toBeVisible();
+    // Refactor sonrasi bos-liste mesaji "Liste henüz boş" oldu.
+    await expect(options.getByText("Liste henüz boş")).toBeVisible();
     // Click Ekle with empty input
     await options.getByRole("button", { name: "Ekle" }).click();
     // Liste hala bos olmali
-    await expect(options.getByText("Güvendiğiniz bağlantı listesi boş")).toBeVisible();
+    await expect(options.getByText("Liste henüz boş")).toBeVisible();
     await options.close();
   });
 

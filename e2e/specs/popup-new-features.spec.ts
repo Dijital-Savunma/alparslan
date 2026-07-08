@@ -27,7 +27,10 @@ test.describe("Popup — Ayarlar sekmesi kaldirildi, header'da gear ikonu", () =
     const popup = await openPopup(context, extensionId);
     await expect(popup.getByRole("button", { name: "Durum" })).toBeVisible();
     await expect(popup.getByRole("button", { name: "Skor" })).toBeVisible();
-    await expect(popup.getByRole("button", { name: "Ayarlar" })).toHaveCount(0);
+    // Gear butonu title="Tüm Ayarlar" — substring match "Ayarlar" bunu
+    // yakalar, count > 0 gorunur. exact: true ile sadece tam "Ayarlar"
+    // adli bir buton var mi diye bakariz (yok).
+    await expect(popup.getByRole("button", { name: "Ayarlar", exact: true })).toHaveCount(0);
     await popup.close();
   });
 
@@ -40,16 +43,17 @@ test.describe("Popup — Ayarlar sekmesi kaldirildi, header'da gear ikonu", () =
 });
 
 test.describe("Popup — Durum sekmesindeki sayac kartlari", () => {
-  test("3 sayac karti gorunur (Kontrol Geçmişi, Tehlikeli Adresler, Şüpheli Durumlar)", async ({
+  test("3 sayac karti gorunur (Kontrol Geçmişi, Tehlikeli Adresler, Bilinmeyen Adresler)", async ({
     context,
     extensionId,
   }) => {
     const popup = await openPopup(context, extensionId);
-    // 3 SkorCountButton karti — Kontrol Geçmişi + Tehlikeli Adresler + Şüpheli
-    // Durumlar (refactor sonrasi 4-stat satirinin yerine geldi).
+    // 3 SkorCountButton karti — Kontrol Geçmişi + Tehlikeli Adresler +
+    // Bilinmeyen Adresler ("Şüpheli Durumlar" adi refactor sirasinda
+    // "Bilinmeyen Adresler" olarak yeniden adlandirildi).
     await expect(popup.getByText("Kontrol Geçmişi")).toBeVisible();
     await expect(popup.getByText("Tehlikeli Adresler")).toBeVisible();
-    await expect(popup.getByText("Şüpheli Durumlar")).toBeVisible();
+    await expect(popup.getByText("Bilinmeyen Adresler")).toBeVisible();
     await popup.close();
   });
 
