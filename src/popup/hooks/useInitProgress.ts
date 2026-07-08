@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Background service worker'in baslangic (USOM, whitelist, list cache vb.)
  * yukleme durumunu polling ile takip eder. Backoff'lu polling: ilk istek
- * 300ms, sonrasinda 1.5× kati ile artarak 5 saniyede tavan yapar. Bu
- * sayede SW her wake-up'inda eski sabit 300ms-loop'undaki kadar mesaj
- * almiyor (uzun init'lerde dakikada 200 mesajdan ~10-15 mesaja iniyor).
+ * 200ms, sonrasinda 1.4× kati ile artarak 1.5 saniyede tavan yapar. Bu
+ * sayede SW her wake-up'inda mesaj sayisi makul kaliyor ama yukleme
+ * UI'i kullaniciya "donmus" gelmiyor (5 sn'lik eski tavan cok uzundu).
  *
  * Geri donulen veri:
  *  - initStatus: SW'den son alinan durum (null = henuz cevap yok)
@@ -25,9 +25,43 @@ export interface InitStatus {
 }
 
 const SESSION_DONE_KEY = "alparslanInitDone";
-const POLL_INITIAL_DELAY_MS = 300;
-const POLL_MAX_DELAY_MS = 5000;
-const POLL_BACKOFF_FACTOR = 1.5;
+const POLL_INITIAL_DELAY_MS = 200;
+const POLL_MAX_DELAY_MS = 1500;
+const POLL_BACKOFF_FACTOR = 1.4;
+
+/**
+ * Yukleme bari "atlamali" gozukmesin diye, polling sonucu gelen hedef
+ * yuzdeye dogru ekrandaki degeri %1/tick ile yumusakca yaklastirir. SW
+ * 40'tan 80'e zipladiginda kullanici 1, 2, 3 ... 80 seklinde yukseldigini
+ * gorur, "barim donmus" izlenimi yok.
+ *
+ * `target`'in tekrar dustugu olmaz (yukleme monoton); yine de defensive
+ * olarak target geri donerse display'i de geri sabitliyor.
+ */
+export function useSmoothPercent(target: number, stepMs = 18): number {
+  const [display, setDisplay] = useState(0);
+  const displayRef = useRef(0);
+
+  useEffect(() => {
+    if (displayRef.current >= target) {
+      if (displayRef.current !== target) {
+        displayRef.current = target;
+        setDisplay(target);
+      }
+      return;
+    }
+    const id = window.setInterval(() => {
+      displayRef.current = Math.min(target, displayRef.current + 1);
+      setDisplay(displayRef.current);
+      if (displayRef.current >= target) {
+        window.clearInterval(id);
+      }
+    }, stepMs);
+    return () => window.clearInterval(id);
+  }, [target, stepMs]);
+
+  return display;
+}
 
 export function useInitProgress(): {
   initStatus: InitStatus | null;

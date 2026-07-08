@@ -10,7 +10,12 @@ test.describe("Whitelist effect", () => {
     const options = await openOptionsPage(context, extensionId);
     const before = await getListStats(options);
 
-    await options.getByRole("textbox").fill("hgs.simple-url.com");
+    // Options default section artik "Genel Ayarlar" — whitelist input'una
+    // erisebilmek icin sidebar'da "Güvendiğim Bağlantılar" sekmesine gec.
+    await options.getByRole("button", { name: "Güvendiğim Bağlantılar", exact: true }).click();
+    // Sayfada birden fazla textbox olabilecegi icin placeholder ile
+    // hedef alaniyla dogrudan konusalim.
+    await options.getByPlaceholder(/istisna|adresini girin|example\.com/i).fill("hgs.simple-url.com");
     await options.getByRole("button", { name: "Ekle" }).click();
     await expect(options.getByText("hgs.simple-url.com", { exact: true })).toBeVisible();
 
@@ -38,7 +43,9 @@ test.describe("Whitelist effect", () => {
     const before = await checkUrl(options, flagged);
     expect(["DANGEROUS", "SUSPICIOUS"]).toContain(before.level);
 
-    await options.getByRole("textbox").fill("isbenk.com.tr");
+    // Sidebar'da whitelist sekmesine gec + placeholder ile input hedefle.
+    await options.getByRole("button", { name: "Güvendiğim Bağlantılar", exact: true }).click();
+    await options.getByPlaceholder(/istisna|adresini girin|example\.com/i).fill("isbenk.com.tr");
     await options.getByRole("button", { name: "Ekle" }).click();
     await expect(options.getByText("isbenk.com.tr", { exact: true })).toBeVisible();
 

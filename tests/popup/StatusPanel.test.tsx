@@ -15,7 +15,6 @@ const baseProps = {
   isWhitelisted: false,
   popupWhitelistInput: "",
   setPopupWhitelistInput: () => {},
-  handleAddToWhitelist: () => {},
   setShowCloseConfirm: () => {},
   setShowTrustConfirm: () => {},
   enabled: true,
@@ -29,13 +28,13 @@ describe("StatusPanel speech bubble", () => {
     // Bolding splits the sentence across nodes, so assert on the container text.
     expect(container.textContent).toContain("güvendiğiniz bağlantılara eklediniz");
     expect(container.textContent).toContain("iyi gezintiler");
-    // Must NOT claim we scanned it.
-    expect(container.textContent).not.toContain("baştan aşağı taradım");
+    // Must NOT claim we ourselves found it safe — the user vouched for it.
+    expect(container.textContent).not.toContain("Alparslan tarafından güvenli bulundu");
   });
 
-  it("shows the generic scanned-safe message for a non-whitelisted safe site", () => {
+  it("shows the generic safe message for a non-whitelisted safe site", () => {
     const { container } = render(<StatusPanel {...baseProps} isWhitelisted={false} />);
-    expect(container.textContent).toContain("baştan aşağı taradım");
+    expect(container.textContent).toContain("Alparslan tarafından güvenli bulundu");
     expect(container.textContent).not.toContain("güvendiğiniz bağlantılara eklediniz");
   });
 });

@@ -1,8 +1,28 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { type ExtensionSettings } from "@/utils/types";
 import t from "@/i18n/tr";
 import { narrateReason } from "../narrateReason";
 import { type SecurityStatus } from "../App";
+
+/**
+ * "Kontrol ediliyor" satirinda animasyonlu nokta sayisi (0→1→2→3→0...)
+ * dondurur. Sadece displayStatus === "loading" iken interval kurulur, baska
+ * durumda hemen "" kalır. Boylece kullanici "ekran dondu mu" diye dusunmez.
+ */
+export function useLoadingDots(active: boolean): string {
+  const [dots, setDots] = useState("");
+  useEffect(() => {
+    if (!active) {
+      setDots("");
+      return;
+    }
+    const id = window.setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 400);
+    return () => window.clearInterval(id);
+  }, [active]);
+  return dots;
+}
 
 /**
  * Popup Durum sekmesindeki ana status panosu. Iki sunum modu var:
@@ -31,7 +51,6 @@ export function StatusPanel({
   isWhitelisted,
   popupWhitelistInput,
   setPopupWhitelistInput,
-  handleAddToWhitelist,
   setShowCloseConfirm,
   setShowTrustConfirm,
   enabled,
@@ -47,7 +66,6 @@ export function StatusPanel({
    *  geliyor, ileride autofill chip burada kullanilirsa diye prop'ta tutuldu. */
   popupWhitelistInput: string;
   setPopupWhitelistInput: (v: string) => void;
-  handleAddToWhitelist: () => void;
   setShowCloseConfirm: (v: boolean) => void;
   setShowTrustConfirm: (v: boolean) => void;
   enabled: boolean;
@@ -56,16 +74,15 @@ export function StatusPanel({
   // doğrudan kullanılacaklar.
   void popupWhitelistInput;
   void setPopupWhitelistInput;
+  // Loading durumunda "Kontrol ediliyor" yazisina animasyonlu nokta katarak
+  // arayuzun donmadigini gostermek icin (sadece loading'de aktif).
+  const loadingDots = useLoadingDots(displayStatus === "loading");
   return (
       <div
         style={{
-          padding: "12px 16px",
+          padding: "18px 6px",
           background: config?.bg || "rgba(107, 114, 128, 0.05)",
-          borderBottom: `3px solid ${config?.color || "#e5e7eb"}`,
-          // Soft inner top-edge glow in the status colour so the panel reads
-          // as a tinted surface on both light and dark themes without
-          // needing a heavy fill.
-          boxShadow: config ? `inset 0 1px 0 ${config.color}40` : "none",
+          borderBottom: `2px solid ${config?.color ? config.color + "88" : "rgba(148, 163, 184, 0.55)"}`,
           position: "relative",
         }}
       >
@@ -81,14 +98,21 @@ export function StatusPanel({
             row that was here before. Loading/disabled states always fall back
             to the classic row since there's no verdict to narrate. */}
         {settings?.speechBubbleEnabled !== false && displayStatus !== "loading" && displayStatus !== "disabled" ? (() => {
+          // Bilinmeyen (unknown) speech bubble icin gri palet: buton
+          // ile ayni kimlik degil (buton mavi info, bubble gri neutral).
+          // "Bilinmiyor" durumu icin gri ton daha isabetli.
           const variant =
             displayStatus === "safe" ? "success" :
             displayStatus === "dangerous" ? "danger" :
             displayStatus === "suspicious" ? "warning" :
-            "info";
+            "neutral";
           // Domain shown inside the sentence ("chatgpt.com sayfasını sizin
           // için..."); falls back to a generic noun when we don't have one.
-          const siteName = displayDomain && displayDomain !== "—" ? displayDomain : "Bu sayfa";
+          const isGenericSite = !displayDomain || displayDomain === "—";
+          // Generic durumda siteName ("Bu sayfayı") mesajin baslangicindaki
+          // ekli hali — highlight logic dIdx bunu bulur ve tumunu strong'a
+          // sarar: **Bu sayfayı** ilk defa gorüyorum...
+          const siteName = isGenericSite ? "Bu sayfayı" : displayDomain;
           // A SAFE verdict on a site the user themselves trusts — greet them
           // accordingly instead of claiming we scanned it. Keys off the
           // authoritative isWhitelisted prop from App so it stays in sync with
@@ -99,32 +123,31 @@ export function StatusPanel({
             displayStatus === "safe" ? t.speechBubble.safe(siteName) :
             displayStatus === "dangerous" ? t.speechBubble.dangerous(siteName) :
             displayStatus === "suspicious" ? t.speechBubble.suspicious(siteName) :
+            isGenericSite ? t.speechBubble.unknownGeneric :
             t.speechBubble.unknown(siteName);
-          // Leading status emoji renders OUTSIDE the text flow so wrapped
-          // lines start where "the words" start, not next to the bubble's
-          // left edge.
-          const leadEmoji =
-            displayStatus === "safe" ? "🛡️" :
-            displayStatus === "dangerous" ? "🚨" :
-            displayStatus === "suspicious" ? "⚠️" :
-            "🔍";
           // Word that gets bolded + status-coloured so the eye lands on the
           // verdict in one glance without making the whole bubble loud.
           const highlightWord =
             whitelisted ? "iyi gezintiler" :
-            displayStatus === "safe" ? "güvendesiniz" :
-            displayStatus === "dangerous" ? "uzaklaşın" :
+            displayStatus === "safe" ? "temiz görünüyor" :
+            displayStatus === "dangerous" ? "hemen kapatın" :
             displayStatus === "suspicious" ? "dikkatli olun" :
-            "merak etmeyin";
+            "tedbirli olun";
+          // Vurgu rengi (domain adi + verdict keyword). CSS var kullanarak
+          // karanlik modda otomatik acik tona kayar (btn-*-text light = koyu,
+          // dark = parlak). Boylece "extensions" / "tedbirli olun" gibi
+          // vurgu kelimeleri karanlik zeminde de rahat okunur.
           const accentColor =
-            displayStatus === "safe" ? "#16a34a" :
-            displayStatus === "dangerous" ? "#dc2626" :
-            displayStatus === "suspicious" ? "#d97706" :
-            "#2563eb";
-          // Build the body with two callouts: the domain (semi-bold accent)
-          // and the verdict keyword (bold accent). Both lean on accentColor;
-          // weight separates them.
+            displayStatus === "safe" ? "var(--btn-success-text)" :
+            displayStatus === "dangerous" ? "var(--btn-danger-text)" :
+            displayStatus === "suspicious" ? "var(--btn-warning-text)" :
+            "var(--btn-neutral-text)";
+          // Iki vurgu: domain adi + verdict keyword. Ikisi de AYNI stil —
+          // renk ve fontWeight paylasilir; goz "burada iki onemli sey var"
+          // hissini tek tonda alir. Eskiden domain 600, keyword 700 ile
+          // ayriliyordu; kullanici parite istedi.
           const dIdx = message.indexOf(siteName);
+          const emphasisStyle = { color: accentColor, fontWeight: 700, whiteSpace: "nowrap" as const };
           const renderBody = (): React.ReactNode => {
             if (dIdx === -1) {
               const hIdx = message.indexOf(highlightWord);
@@ -132,7 +155,7 @@ export function StatusPanel({
               return (
                 <>
                   {message.slice(0, hIdx)}
-                  <strong style={{ color: accentColor, fontWeight: 700, whiteSpace: "nowrap" }}>{message.slice(hIdx, hIdx + highlightWord.length)}</strong>
+                  <strong style={emphasisStyle}>{message.slice(hIdx, hIdx + highlightWord.length)}</strong>
                   {message.slice(hIdx + highlightWord.length)}
                 </>
               );
@@ -144,7 +167,7 @@ export function StatusPanel({
               return (
                 <>
                   {beforeDomain}
-                  <span style={{ color: accentColor, fontWeight: 600, whiteSpace: "nowrap" }}>{siteName}</span>
+                  <strong style={emphasisStyle}>{siteName}</strong>
                   {afterDomain}
                 </>
               );
@@ -152,9 +175,9 @@ export function StatusPanel({
             return (
               <>
                 {beforeDomain}
-                <span style={{ color: accentColor, fontWeight: 600, whiteSpace: "nowrap" }}>{siteName}</span>
+                <strong style={emphasisStyle}>{siteName}</strong>
                 {afterDomain.slice(0, hIdxAfter)}
-                <strong style={{ color: accentColor, fontWeight: 700, whiteSpace: "nowrap" }}>{afterDomain.slice(hIdxAfter, hIdxAfter + highlightWord.length)}</strong>
+                <strong style={emphasisStyle}>{afterDomain.slice(hIdxAfter, hIdxAfter + highlightWord.length)}</strong>
                 {afterDomain.slice(hIdxAfter + highlightWord.length)}
               </>
             );
@@ -162,56 +185,46 @@ export function StatusPanel({
           const messageNode = renderBody();
           return (
             <>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginBottom: 4 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginBottom: 4, perspective: "800px" }}>
                 {/* Big logo with soft outer glow in the verdict colour — sits
                     flush against the bubble so the speech tail appears to
                     emerge straight from its edge. Hover lifts + tilts the
                     helmet slightly to feel alive. */}
-                <div
-                  className={`alparslan-bubble-logo alparslan-mood-${displayStatus}`}
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    background: "var(--surface-card)",
-                    border: `2px solid var(--btn-${variant}-border)`,
-                    boxShadow: `0 0 0 4px var(--btn-${variant}-bg), 0 2px 10px var(--btn-${variant}-border)`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                    marginTop: -2,
-                    cursor: "pointer",
-                  }}
-                >
-                  <img
-                    src="/icons/alparslan_logo.svg"
-                    alt="Alparslan"
-                    style={{ width: "78%", height: "78%" }}
-                  />
-                </div>
-
+                <DraggableLogo displayStatus={displayStatus} variant={variant} />
                 {/* Bubble — soft tinted surface in the verdict colour, dark
                     body text for readability, with a small tail pointing
                     left into the logo. URL pinned to a separated bottom
                     strip with a globe icon. */}
                 <div style={{
                   position: "relative",
-                  flex: 1,
+                  // Bubble genisligini shrink-to-fit yap: flex icinde
+                  // fit-content tek basina yetmediginden text-wrap: balance
+                  // + max-width ile satirlari dengeleriz. Sag tarafta bariz
+                  // beyaz alan kalmaz, wrap noktalari esitlenir.
+                  flex: "0 1 auto",
                   minWidth: 0,
-                  background: `var(--btn-${variant}-bg)`,
-                  border: `1px solid var(--btn-${variant}-border)`,
+                  // Unknown durumunda: bubble bg panelden bir tik daha
+                  // acik (paneldan bagimsiz aciklik disiplini). Border
+                  // slate-400 net cizgi — bg'ler gri kaldigi icin
+                  // balonu ayirt eder.
+                  // Balon bg: paneldan bariz ayrilsin diye ozel --bubble-*-bg
+                  // tokenlari. Light modda panel FDBA74 (koyu turuncu) iken
+                  // bubble FEE2C6 (acik pastel turuncu) — goz balonu bulur.
+                  background:
+                    variant === "neutral" ? "var(--bubble-neutral-bg)" :
+                    variant === "warning" ? "var(--bubble-warning-bg)" :
+                    variant === "danger" ? "var(--bubble-danger-bg)" :
+                    variant === "success" ? "var(--bubble-success-bg)" :
+                    `var(--btn-${variant}-bg)`,
+                  border: variant === "neutral"
+                    ? "1px solid var(--bubble-neutral-border)"
+                    : `1px solid var(--btn-${variant}-border)`,
                   borderRadius: 12,
                   color: "var(--text)",
                   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
                   marginLeft: 4,
                 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 4, padding: "8px 11px 7px", fontSize: 12.5, lineHeight: 1.45 }}>
-                    {/* Leading verdict emoji as its own flex item so wrapped
-                        lines of the body align with the body's left edge
-                        instead of the bubble's. */}
-                    <span style={{ flexShrink: 0, lineHeight: 1.45 }}>{leadEmoji}</span>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 4, padding: "12px 10px 10px 12px", fontSize: 13.5, lineHeight: 1.5 }}>
                     <div style={{ flex: 1, minWidth: 0, hyphens: "auto" }}>
                       {messageNode}
                       {/* Balonun ICINDE: "dikkatli olun!" cumlesinin hemen
@@ -282,12 +295,12 @@ export function StatusPanel({
                         <button
                           onClick={() => setShowCloseConfirm(true)}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#1d4ed8";
+                            e.currentTarget.style.background = "var(--accent-info-deep)";
                             e.currentTarget.style.transform = "scale(1.04)";
                             e.currentTarget.style.boxShadow = "0 3px 8px rgba(37, 99, 235, 0.40)";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "#2563eb";
+                            e.currentTarget.style.background = "var(--accent-info)";
                             e.currentTarget.style.transform = "scale(1)";
                             e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.10)";
                           }}
@@ -296,7 +309,7 @@ export function StatusPanel({
                             // Always corporate blue, regardless of verdict colour. The bubble
                             // already carries the warning hue; the button is a calm CTA that
                             // shouldn't panic the user when the site isn't confirmed-malicious.
-                            background: "#2563eb",
+                            background: "var(--accent-info)",
                             color: "#ffffff",
                             border: "none",
                             padding: "3px 5px",
@@ -314,10 +327,6 @@ export function StatusPanel({
                             lineHeight: 1.2,
                           }}
                         >
-                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
                           {t.speechBubble.actionClose}
                         </button>
                         {!isWhitelisted && (
@@ -358,19 +367,46 @@ export function StatusPanel({
                       </div>
                     </>
                   )}
-                  {/* Tail (rotated square overlapping the bubble's left edge
-                      so its tip is flush with the logo). */}
-                  <div style={{
-                    position: "absolute",
-                    left: -5,
-                    top: 14,
-                    transform: "rotate(45deg)",
-                    width: 9,
-                    height: 9,
-                    background: `var(--btn-${variant}-bg)`,
-                    borderLeft: `1px solid var(--btn-${variant}-border)`,
-                    borderBottom: `1px solid var(--btn-${variant}-border)`,
-                  }} />
+                  {/* Sola bakan tekil ucgen kuyruk (Alparslan yonu). Kare
+                      rotate(45deg) trigger 4 kenarli bir rhombus verdigi
+                      icin bazi kombinasyonlarda saga da bir "ok" gorunuyordu.
+                      CSS border-triangle ile SADECE sola bakan tek uc bir
+                      ucgen olusuruyoruz. Dis ucgen border rengi, ic ucgen
+                      bubble bg — birinci ucgenin uzerinde 1px kaydirilmis. */}
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      left: -7,
+                      top: 12,
+                      width: 0,
+                      height: 0,
+                      borderTop: "7px solid transparent",
+                      borderBottom: "7px solid transparent",
+                      borderRight:
+                        variant === "neutral"
+                          ? "7px solid var(--bubble-neutral-border)"
+                          : `7px solid var(--btn-${variant}-border)`,
+                    }}
+                  />
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      left: -6,
+                      top: 13,
+                      width: 0,
+                      height: 0,
+                      borderTop: "6px solid transparent",
+                      borderBottom: "6px solid transparent",
+                      borderRight:
+                        variant === "neutral" ? "6px solid var(--bubble-neutral-bg)" :
+                        variant === "warning" ? "6px solid var(--bubble-warning-bg)" :
+                        variant === "danger" ? "6px solid var(--bubble-danger-bg)" :
+                        variant === "success" ? "6px solid var(--bubble-success-bg)" :
+                        `6px solid var(--btn-${variant}-bg)`,
+                    }}
+                  />
                 </div>
               </div>
 
@@ -378,10 +414,20 @@ export function StatusPanel({
           );
         })() : (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8, width: "100%" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 7, flex: 1, minWidth: 0 }}>
+            {/* Nokta hep title satirinin gorsel merkezi ile hizali kalmali —
+                eski marginTop: -15 hack'i 2-satirli verdict goruntusunde
+                calisiyordu ama displayDomain bos (loading / chrome://)
+                durumlarda noktayi titrin uzerine itiyordu. Cozum:
+                alignItems flex-start + dot'a sabit marginTop: 6 (24px
+                title satir yuksekligi - 10px dot / 2 = ~7), boylece
+                domain olsa da olmasa da hizali. */}
             <span
               style={{
-                animation: displayStatus === "safe" && enabled ? "safePulse 1.6s ease-out infinite" : "none",
+                animation:
+                  displayStatus === "loading" ? "loadingPulse 1.1s ease-in-out infinite" :
+                  displayStatus === "safe" && enabled ? "safePulse 1.6s ease-out infinite" :
+                  "none",
                 boxShadow: displayStatus === "safe" && enabled ? "0 0 0 0 rgba(22, 163, 74, 0.45)" : "none",
                 width: 10,
                 height: 10,
@@ -391,7 +437,7 @@ export function StatusPanel({
                   displayStatus === "safe" ? "#16a34a" :
                   displayStatus === "dangerous" ? "#dc2626" :
                   displayStatus === "suspicious" ? "#d97706" : "#6b7280",
-                marginTop: -15,
+                marginTop: 7,
                 flexShrink: 0,
               }}
             />
@@ -406,10 +452,14 @@ export function StatusPanel({
               }
               style={{ display: "flex", flexDirection: "column", justifyContent: "center", minWidth: 0 }}
             >
-              <div style={{ fontWeight: 700, fontSize: 16, color: config?.color || "#374151" }}>
-                {displayStatus === "loading" ? t.status.checking : config?.label}
+              <div style={{ fontWeight: 700, fontSize: 16, color: config?.color || "var(--text)" }}>
+                {displayStatus === "loading"
+                  ? <>{t.status.checking.replace(/\.+$/, "")}{loadingDots}</>
+                  : config?.label}
               </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{displayDomain}</div>
+              {displayDomain && displayDomain !== "—" && (
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{displayDomain}</div>
+              )}
             </div>
           </div>
 
@@ -420,22 +470,27 @@ export function StatusPanel({
             {displayStatus !== "loading" && !isWhitelisted && displayDomain && displayDomain !== "\u2014" &&
               (displayStatus === "dangerous" || displayStatus === "suspicious" || displayStatus === "unknown") && (
               <button
-                onClick={handleAddToWhitelist}
+                // Asistan modundaki "Bu Adrese Güven" akisi ile bire bir ayni:
+                // direkt whitelist'e eklemek yerine once onay modali aciliyor —
+                // ikisinin davranisi farkli olursa kullanici hangi yolla
+                // gectigine gore sonuc baska olur, kafa karistirici.
+                // Modal asistan modundan bagimsiz; klasik gorunumde bile cikar.
+                onClick={() => setShowTrustConfirm(true)}
                 title={t.popupWhitelist.tooltipAdd}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#dbeafe";
-                  e.currentTarget.style.borderColor = "#60a5fa";
+                  e.currentTarget.style.background = "var(--quick-whitelist-bg-hover)";
+                  e.currentTarget.style.borderColor = "var(--quick-whitelist-border-hover)";
                   e.currentTarget.style.transform = "translateY(-1px)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#eff6ff";
-                  e.currentTarget.style.borderColor = "#bfdbfe";
+                  e.currentTarget.style.background = "var(--quick-whitelist-bg)";
+                  e.currentTarget.style.borderColor = "var(--quick-whitelist-border)";
                   e.currentTarget.style.transform = "translateY(0)";
                 }}
                 style={{
-                  border: "1px solid #bfdbfe",
-                  background: "#eff6ff",
-                  color: "#2563eb",
+                  border: "1px solid var(--quick-whitelist-border)",
+                  background: "var(--quick-whitelist-bg)",
+                  color: "var(--quick-whitelist-text)",
                   fontSize: 11,
                   fontWeight: 700,
                   padding: "5px 9px",
@@ -456,5 +511,208 @@ export function StatusPanel({
         {/* Eski "\u2022 reason" listesi balonun ICINE tasindi (yukaridaki
             narrated bullets). Burada artik render etmiyoruz. */}
       </div>
+  );
+}
+
+/**
+ * Suruklenerek 3D olarak dondurulen Alparslan logosu \u2014 bozuk para
+ * gibi. Yatay drag \u2192 rotateY, dikey drag \u2192 rotateX. Bg + border +
+ * SVG hepsi birlikte doner.
+ *
+ * Guzellestirmeler:
+ *  - Drag sirasinda hafif buyume (scale 1.05) + shadow \u2014 "elinde
+ *    tutuyorsun" hissi
+ *  - Serbest birakinca momentum: son ~120ms'lik hiza gore coin
+ *    kendi kendine bir sure daha doner (velocity * decay her frame),
+ *    yavaslayarak durur
+ *  - requestAnimationFrame ile 60fps akici hareket
+ */
+function DraggableLogo({
+  displayStatus,
+  variant,
+}: {
+  displayStatus: SecurityStatus;
+  variant: string;
+}) {
+  const [rotationX, setRotationX] = useState(0);
+  const [rotationY, setRotationY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  // Drag boyunca son hareketleri sakla (momentum icin son ~120ms'lik
+  // hizi hesaplariz).
+  const dragStateRef = useRef<{
+    startX: number;
+    startY: number;
+    startRotationX: number;
+    startRotationY: number;
+    lastX: number;
+    lastY: number;
+    lastTime: number;
+    velocityX: number;
+    velocityY: number;
+  } | null>(null);
+  const momentumRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleMove = (e: MouseEvent) => {
+      const s = dragStateRef.current;
+      if (!s) return;
+      const deltaX = e.clientX - s.startX;
+      const deltaY = e.clientY - s.startY;
+      const now = performance.now();
+      // Intro sayfasindaki animasyon ile TAM ayni: piksel delta cinsinden
+      // velocity (dt bolmesi yok). Momentum'da direkt vx eklenecek,
+      // fizik his intro'daki 3D coin ile bire bir esit.
+      const instVx = e.clientX - s.lastX;
+      const instVy = e.clientY - s.lastY;
+      s.velocityX = s.velocityX * 0.3 + instVx * 0.7;
+      s.velocityY = s.velocityY * 0.3 + instVy * 0.7;
+      s.lastX = e.clientX;
+      s.lastY = e.clientY;
+      s.lastTime = now;
+      setRotationY(s.startRotationY + deltaX);
+      setRotationX(s.startRotationX - deltaY);
+    };
+    // Aciyi kisa yol icin [-180, 180]'e normalize et \u2014 rotate(350) == rotate(-10)
+    // gorsel olarak; ancak decay ederken hedef 0'a en yakin uzunluktan
+    // gidilsin diye once wrap ediyoruz. Boylece 3 tam donusten sonra
+    // spring-back reversion 3 ters donus yapmiyor.
+    const wrapAngle = (a: number) => (((a + 180) % 360) + 360) % 360 - 180;
+
+    // Momentum bittikten sonra otomatik olarak devrolur \u2014 kullaniciyi acida
+    // birakip donmez, yavas yavas 0'a doner.
+    const runSpringBack = () => {
+      setRotationX((p) => wrapAngle(p));
+      setRotationY((p) => wrapAngle(p));
+      const tick = () => {
+        let done = true;
+        setRotationX((prev) => {
+          const next = prev * 0.88;
+          if (Math.abs(next) > 0.3) done = false;
+          return Math.abs(next) > 0.3 ? next : 0;
+        });
+        setRotationY((prev) => {
+          const next = prev * 0.88;
+          if (Math.abs(next) > 0.3) done = false;
+          return Math.abs(next) > 0.3 ? next : 0;
+        });
+        if (!done) {
+          momentumRafRef.current = requestAnimationFrame(tick);
+        } else {
+          momentumRafRef.current = null;
+        }
+      };
+      momentumRafRef.current = requestAnimationFrame(tick);
+    };
+
+    const handleUp = () => {
+      const s = dragStateRef.current;
+      setIsDragging(false);
+      if (!s) return;
+      // Momentum: son hiz momentumRafRef ile decay ederek uygulanir.
+      // Sadece belli bir esigin uzerindeki hizlarda calisir.
+      // Intro sayfasi animasyonu ile TAM ayni parametreler:
+      // - decay 0.94/frame, - direkt vx ekleme (carpansiz), - esik 0.05.
+      if (Math.abs(s.velocityX) > 0.5 || Math.abs(s.velocityY) > 0.5) {
+        let vx = s.velocityX;
+        let vy = s.velocityY;
+        const tick = () => {
+          vx *= 0.94;
+          vy *= 0.94;
+          setRotationY((prev) => prev + vx);
+          setRotationX((prev) => prev - vy);
+          if (Math.abs(vx) > 0.05 || Math.abs(vy) > 0.05) {
+            momentumRafRef.current = requestAnimationFrame(tick);
+          } else {
+            momentumRafRef.current = null;
+            runSpringBack();
+          }
+        };
+        momentumRafRef.current = requestAnimationFrame(tick);
+      } else {
+        runSpringBack();
+      }
+      dragStateRef.current = null;
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [isDragging]);
+
+  // Component unmount olursa momentum'u iptal et \u2014 memory leak yok.
+  useEffect(() => {
+    return () => {
+      if (momentumRafRef.current !== null) {
+        cancelAnimationFrame(momentumRafRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div
+      className={`alparslan-bubble-logo alparslan-mood-${displayStatus}${isDragging ? " dragging" : ""}`}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        // Devam eden momentum varsa iptal et \u2014 yeni drag sifirdan
+        // baslar.
+        if (momentumRafRef.current !== null) {
+          cancelAnimationFrame(momentumRafRef.current);
+          momentumRafRef.current = null;
+        }
+        dragStateRef.current = {
+          startX: e.clientX,
+          startY: e.clientY,
+          startRotationX: rotationX,
+          startRotationY: rotationY,
+          lastX: e.clientX,
+          lastY: e.clientY,
+          lastTime: performance.now(),
+          velocityX: 0,
+          velocityY: 0,
+        };
+        setIsDragging(true);
+      }}
+      style={{
+        width: 48,
+        height: 48,
+        borderRadius: "50%",
+        flexShrink: 0,
+        background: "var(--logo-frame-bg)",
+        border: `2px solid var(--btn-${variant}-border)`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        marginTop: -2,
+        cursor: isDragging ? "grabbing" : "grab",
+        userSelect: "none",
+        transformStyle: "preserve-3d",
+        // 3D rotasyon + drag'de hafif buyume; hicbir golge / overlay YOK \u2014
+        // logo her zaman saf ve temiz kalir.
+        transform: `rotateX(${rotationX}deg) rotateY(${rotationY}deg) scale(${isDragging ? 1.06 : 1})`,
+        // Intro sayfasindaki `.intro-logo` ile birebir ayni transition
+        // stratejisi: drag SIRASINDA transform anlik (1:1 fare takibi
+        // icin), drag DEGILKEN (momentum + spring-back + rest) 0.35s
+        // ease smoothing.
+        transition: isDragging ? "none" : "transform 0.35s ease",
+      }}
+    >
+      <img
+        src="/icons/alparslan_logo.svg"
+        alt="Alparslan"
+        decoding="async"
+        loading="eager"
+        draggable={false}
+        style={{
+          width: "78%",
+          height: "78%",
+          imageRendering: "-webkit-optimize-contrast" as const,
+          pointerEvents: "none",
+        }}
+      />
+    </div>
   );
 }

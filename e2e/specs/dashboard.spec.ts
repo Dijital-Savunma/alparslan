@@ -17,9 +17,6 @@ test.describe("Dashboard Score — Happy Path", () => {
     // Skor halkası altındaki yeni "Skor Analizi" panosu.
     await expect(popup.getByText("Günlük skor")).toBeVisible({ timeout: 10000 });
     await expect(popup.getByText("Skor Analizi")).toBeVisible();
-    // Detaylı Güvenlik Taraması insight satırı her zaman görünür
-    // (kapaliyken kirmizi rozet, aciksa yesil cumle).
-    await expect(popup.getByText(/Detaylı Güvenlik Taraması/)).toBeVisible();
     await popup.close();
   });
 
@@ -79,18 +76,9 @@ test.describe("Dashboard Score — Negative Scenarios", () => {
     await popup.close();
   });
 
-  test("negative: dashboard should handle extension disabled state", async ({
-    context,
-    extensionId,
-  }) => {
-    const popup = await openPopup(context, extensionId);
-    // "Aktif" toggle artik <button role="switch"> — aria-label uzerinden bulunur.
-    // Bu butona basinca koruma kapanir; intro/onboarding overlay'i acilir
-    // ve React tree gizlenir. Bu yuzden Skor sekmesine tiklayamayiz —
-    // disabled state'in dogru yansidigini introScreen'in varligi ile
-    // dogrularız.
-    await popup.getByRole("switch", { name: /aktif|pasif|koruma/i }).first().click();
-    await expect(popup.locator("#introScreen")).toBeVisible();
-    await popup.close();
+  test.skip("negative: dashboard should handle extension disabled state", async () => {
+    // Toggle popup Header'indan Options > Genel Ayarlar kartina tasindi.
+    // Popup uzerinden koruma kapamak icin dogrudan bir yol kalmadigi
+    // icin bu senaryo Options taban testine devrolur.
   });
 });

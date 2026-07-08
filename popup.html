@@ -32,10 +32,14 @@
       .intro-card {
         width: 100%;
         min-height: 285px;
-        border-radius: 20px;
-        background: rgba(255, 255, 255, 0.92);
-        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
-        border: 1px solid rgba(226, 232, 240, 0.95);
+        /* Kose ovalligi + border + golge kaldirildi — kullanici koselerde
+           belirgin cizgi/oval sinir istemedi. Kart artik ic dolgu ile
+           kimlik tanir, kenarlarda bir cerceve yok. Bg TRANSPARENT ki
+           .intro-screen'deki arka plan cizgileri gorunur olsun. */
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        border: none;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -47,91 +51,13 @@
         z-index: 1;
         overflow: hidden;
       }
-      .intro-card::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-        opacity: 0.72;
-        background:
-          linear-gradient(
-            137deg,
-            transparent 0 31%,
-            rgba(30, 64, 175, 0.1) 31.2%,
-            rgba(30, 64, 175, 0.1) 31.7%,
-            transparent 32%
-          ),
-          linear-gradient(
-            42deg,
-            transparent 0 44%,
-            rgba(34, 197, 94, 0.08) 44.2%,
-            rgba(34, 197, 94, 0.08) 44.8%,
-            transparent 45.2%
-          ),
-          linear-gradient(
-            104deg,
-            transparent 0 60%,
-            rgba(30, 64, 175, 0.08) 60.2%,
-            rgba(30, 64, 175, 0.08) 60.8%,
-            transparent 61.2%
-          ),
-          linear-gradient(
-            22deg,
-            transparent 0 72%,
-            rgba(34, 197, 94, 0.07) 72.2%,
-            rgba(34, 197, 94, 0.07) 72.8%,
-            transparent 73.2%
-          ),
-          radial-gradient(
-            circle at 29% 28%,
-            rgba(30, 64, 175, 0.42) 0 2px,
-            transparent 3px
-          ),
-          radial-gradient(
-            circle at 68% 31%,
-            rgba(34, 197, 94, 0.4) 0 2px,
-            transparent 3px
-          ),
-          radial-gradient(
-            circle at 23% 66%,
-            rgba(34, 197, 94, 0.34) 0 2px,
-            transparent 3px
-          ),
-          radial-gradient(
-            circle at 75% 72%,
-            rgba(30, 64, 175, 0.34) 0 2px,
-            transparent 3px
-          );
-      }
+      /* Karttaki dekoratif diagonal cizgi + nokta pattern'i tamamen
+         kaldirildi — koselerde bariz cizgiler olarak durdugu icin
+         kullanici sadelestirilmesini istedi. Zemin yeterince gorsel
+         zenginlige sahip. */
+      .intro-card::before,
       .intro-card::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-        opacity: 0.48;
-        background:
-          radial-gradient(
-            circle at 50% 42%,
-            rgba(30, 64, 175, 0.1),
-            transparent 92px
-          ),
-          radial-gradient(
-            circle at 68% 31%,
-            rgba(34, 197, 94, 0.12),
-            transparent 38px
-          ),
-          radial-gradient(
-            circle at 29% 28%,
-            rgba(59, 130, 246, 0.1),
-            transparent 38px
-          ),
-          radial-gradient(
-            circle at 75% 72%,
-            rgba(30, 64, 175, 0.08),
-            transparent 42px
-          );
+        display: none;
       }
       .intro-title {
         font-size: 12px;
@@ -164,15 +90,32 @@
         position: relative;
         z-index: 1;
       }
+      .intro-logo-wrapper {
+        perspective: 800px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        z-index: 1;
+      }
       .intro-logo {
-        width: 82px;
-        height: 82px;
+        width: 96px;
+        height: 96px;
         object-fit: contain;
         filter: grayscale(1) brightness(0.7)
           drop-shadow(0 6px 10px rgba(15, 23, 42, 0.1));
         transition:
           filter 0.35s ease,
           transform 0.35s ease;
+        transform-style: preserve-3d;
+        cursor: grab;
+        user-select: none;
+        -webkit-user-drag: none;
+        will-change: transform;
+      }
+      .intro-logo.dragging {
+        cursor: grabbing;
+        transition: filter 0.35s ease !important;
       }
       .intro-logo.awake {
         filter: grayscale(0) brightness(1)
@@ -286,7 +229,7 @@
         inset: 0;
         z-index: 0;
         pointer-events: none;
-        opacity: 0.06;
+        opacity: 0.18;
         background:
           repeating-linear-gradient(
             125deg,
@@ -334,7 +277,7 @@
         inset: 0;
         z-index: 0;
         pointer-events: none;
-        opacity: 0.08;
+        opacity: 0.28;
         background:
           radial-gradient(
             circle at 22% 26%,
@@ -359,6 +302,14 @@
         margin-top: -2px;
         position: relative;
         z-index: 1;
+        transition: transform 0.18s ease, color 0.18s ease;
+      }
+      /* Switch hover'da hem toggle hem hint metnini birlikte buyut —
+         kullanicinin togglenin ustune geldigi anda "burada bir aksiyon
+         var" hissini yazi da paylassin. */
+      .intro-activate-btn:hover .intro-button-hint {
+        transform: scale(1.06);
+        color: #475569;
       }
       .intro-switch-status {
         min-height: 18px;
@@ -414,6 +365,92 @@
         justify-content: center;
         align-items: center;
       }
+
+      /* ============================================================
+         INTRO SCREEN — KARANLIK MOD OVERRIDE
+         intro-screen.ts, storage.settings.darkMode true ise body'ye
+         data-theme="dark" atar. Buradaki kurallar tum ic elemanlari
+         karanlik palete cevirir. React app boot'undan ONCE etkinlesir,
+         intro acildiginda ani-flash olmaz.
+         ============================================================ */
+      [data-theme="dark"] .intro-screen {
+        background:
+          radial-gradient(
+            circle at top,
+            rgba(34, 197, 94, 0.10),
+            transparent 42%
+          ),
+          linear-gradient(180deg, #0a1428 0%, #111e36 100%);
+      }
+      /* Arka plan geometrik cizgiler karanlik modda daha bariz olsun —
+         opacity light modda 0.06/0.08; dark modda hedefimiz 0.30/0.40 ki
+         desen sessizce arka plani sussun ama fark edilsin. */
+      [data-theme="dark"] .intro-screen::before {
+        opacity: 0.30;
+      }
+      [data-theme="dark"] .intro-screen::after {
+        opacity: 0.40;
+      }
+      /* Kart border/gölge yok, koselerdeki dekoratif ::before/::after
+         geometrik cizgi patterni de karanlik modda gizli — kullanici
+         "kose borderleri olmasin" istedi. */
+      [data-theme="dark"] .intro-card {
+        /* Light modla ayni yaklasim: kart transparent, arka plandaki
+           diagonal cizgiler kart alanindan da gorulsun. */
+        background: transparent;
+        border: none;
+        box-shadow: none;
+      }
+      [data-theme="dark"] .intro-card::before,
+      [data-theme="dark"] .intro-card::after {
+        display: none;
+      }
+      /* Ust metin: karanlik modda mavi vurgu istenmedi — sade acik slate.
+         "Sadelikten yana" tercih. */
+      [data-theme="dark"] .intro-title {
+        color: #cbd5e1;
+      }
+      [data-theme="dark"] .intro-subtitle,
+      [data-theme="dark"] .intro-button-hint,
+      [data-theme="dark"] .intro-trust-text {
+        color: #94a3b8;
+      }
+      /* Karanlik modda da logo AKTIVASYON ONCESI sonuk kalmali: light
+         moddaki grayscale + brightness dusurme ayni sekilde uygulanir,
+         drop-shadow hafif eklenir. Awake asama daha spesifik selector
+         ile bunu override eder. */
+      [data-theme="dark"] .intro-logo {
+        filter: grayscale(1) brightness(0.55)
+          drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+      }
+      /* Awake (aktivasyon) sonrasi yesil glow karanlik modda da kalir —
+         genel .intro-logo filter'i override etmek icin daha spesifik. */
+      [data-theme="dark"] .intro-logo.awake {
+        filter: grayscale(0) brightness(1.05)
+          drop-shadow(0 0 12px rgba(34, 197, 94, 0.55))
+          drop-shadow(0 0 28px rgba(34, 197, 94, 0.40));
+      }
+      [data-theme="dark"] .intro-switch {
+        background: linear-gradient(135deg, #1e293b, #334155);
+        box-shadow:
+          inset 0 0 0 2px rgba(148, 163, 184, 0.35),
+          0 8px 18px rgba(0, 0, 0, 0.4);
+      }
+      [data-theme="dark"] .intro-switch-circle {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+      /* "Kalkan Devrede" karanlik modda da yesil kalir — aktif durum
+         belirteci renk kimligini korumali. */
+      [data-theme="dark"] .intro-switch-status.active {
+        color: #4ade80;
+      }
+      [data-theme="dark"] .intro-switch-status {
+        color: #cbd5e1;
+      }
+      [data-theme="dark"] .intro-trust-logo {
+        filter: brightness(1.5) contrast(0.9);
+      }
     </style>
     <script type="module" src="/src/popup/main.tsx"></script>
   </head>
@@ -425,14 +462,17 @@
           sitelere karşı koruyan ücretsiz bir tarayıcı eklentisidir.
         </div>
 
-        <button id="introActivateBtn" class="intro-activate-btn">
+        <div class="intro-logo-wrapper">
           <img
             id="introLogo"
             src="/icons/alparslan_logo.svg"
             alt="Alparslan Logo"
             class="intro-logo"
+            draggable="false"
           />
+        </div>
 
+        <button id="introActivateBtn" class="intro-activate-btn">
           <div class="intro-switch" id="introSwitch">
             <div class="intro-switch-circle" id="introSwitchCircle"></div>
           </div>

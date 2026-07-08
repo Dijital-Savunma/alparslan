@@ -16,11 +16,15 @@ export function SettingCard({
   desc,
   enabled,
   onToggle,
+  iconSrc,
 }: {
   title: string;
   desc: string;
   enabled: boolean;
   onToggle: () => void;
+  /** Opsiyonel: title metninden once kucuk bir gorsel ikon goster
+   *  (ornegin Alparslan asistan toggle'i icin alparslan logosu). */
+  iconSrc?: string;
 }) {
   const [justSaved, setJustSaved] = useState(false);
   const handleToggle = () => {
@@ -52,20 +56,39 @@ export function SettingCard({
       }}
     >
       <div>
-        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>{title}</div>
+        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", display: "flex", alignItems: "center", gap: 6 }}>
+          {iconSrc && (
+            <img
+              src={iconSrc}
+              alt=""
+              width={22}
+              height={22}
+              decoding="async"
+              loading="eager"
+              style={{
+                width: 22,
+                height: 22,
+                objectFit: "contain",
+                flexShrink: 0,
+                // SVG'yi kucuk olcekte oksek kalitede render et — eski 18px
+                // boyutta antialias yumuşatmasi bulaniklik yapiyordu, hem
+                // boyutu biraz yukseltip hem image-rendering ipucu vererek
+                // SVG cizgileri keskin kalir.
+                imageRendering: "-webkit-optimize-contrast" as const,
+              }}
+            />
+          )}
+          <span>{title}</span>
+        </div>
         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{desc}</div>
       </div>
       <div
         title={enabled ? `${title}: ayar acik` : `${title}: ayar kapali`}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "scale(1.08)";
-          e.currentTarget.style.boxShadow = enabled
-            ? "0 0 0 4px rgba(34, 197, 94, 0.18), 0 3px 8px rgba(34, 197, 94, 0.25)"
-            : "0 0 0 4px rgba(148, 163, 184, 0.20), 0 3px 8px rgba(15, 23, 42, 0.15)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.boxShadow = "none";
         }}
         style={{
           width: 36,
@@ -74,7 +97,7 @@ export function SettingCard({
           background: enabled ? "var(--accent-success-bright)" : "#d1d5db",
           position: "relative",
           flexShrink: 0,
-          transition: "background 0.2s, transform 0.18s ease, box-shadow 0.18s ease",
+          transition: "background 0.2s, transform 0.18s ease",
         }}
       >
         <div

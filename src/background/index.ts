@@ -138,6 +138,23 @@ function updateProgress(stepIndex: number, ms?: number): void {
  * "BU SİTE GÜVENLİ DEĞİL" banner + threat badge from the raw checkUrl() re-scan
  * while the popup correctly showed güvenli.
  */
+/**
+ * Sag tik menusunu state.settings.contextMenuEnabled'a gore senkronize eder.
+ * Acik ise removeAll + create (idempotent), kapali ise removeAll. SW init'te
+ * bir kez + SETTINGS_UPDATED mesajinda her degisiklikte cagrilir.
+ */
+function applyContextMenuFromSettings(): void {
+  chrome.contextMenus.removeAll(() => {
+    if (state.settings.contextMenuEnabled !== false) {
+      chrome.contextMenus.create({
+        id: "alparslan-scan-link",
+        title: "Alparslan ile Güvenliği Kontrol Et",
+        contexts: ["link", "selection", "page"],
+      });
+    }
+  });
+}
+
 async function evaluateTab(url: string): Promise<ThreatResult> {
   try {
     const hostname = new URL(url).hostname.toLowerCase();
@@ -202,16 +219,42 @@ async function initServiceWorker(): Promise<void> {
   // OWN progress the moment it settles — so the bar climbs 40→60→80→100
   // smoothly instead of jumping straight from 40 to 100 when all three finish
   // together.
+  //
+  // Per-step timeout (5 sn): safe-fetch'in 30 sn default'u bir adımı bloklarsa
+  // SW init donardı; kullanici "Güvendiğim bağlantılar yükleniyor"da 30 sn
+  // bekliyordu. Timeout doldugunda adımı "tamamlandı" sayıyoruz — gercek
+  // fetch arka planda tamamlanmaya devam ediyor, sadece UI bekletmiyor.
+  const STEP_BUDGET_MS = 5000;
+  function withStepTimeout<T>(p: Promise<T>, label: string): Promise<T | void> {
+    // p.catch ile asıl promise'in late rejection'ını sessizce yutuyoruz —
+    // timeout race'i kazandiktan sonra orijinal fetch/IDB hata firlatirsa
+    // chrome unhandled rejection'i konsola dokuyordu (mertinkos review).
+    // Buradaki amac zaten "geçti sayalim, arka planda gitsin" oldugu icin
+    // gec gelen hata sadece logger.warn'a dusurulup gomuluyor.
+    const safeP = p.catch((err) => {
+      logger.warn(`${label} late rejection (after timeout):`, err);
+    });
+    return Promise.race([
+      safeP,
+      new Promise<void>((resolve) =>
+        setTimeout(() => {
+          logger.warn(`${label} exceeded ${STEP_BUDGET_MS}ms budget — letting SW init continue, finish in background`);
+          resolve();
+        }, STEP_BUDGET_MS),
+      ),
+    ]);
+  }
+
   initProgress.step = t.init.usom + " " + t.init.loadingSuffix;
   const t2 = Date.now();
 
-  const usomP = initUsomBlocklist()
+  const usomP = withStepTimeout(initUsomBlocklist(), "USOM init")
     .catch((e) => logger.warn("USOM init failed:", e))
     .finally(() => updateProgress(2, Date.now() - t2));
-  const wlP = initWhitelist()
+  const wlP = withStepTimeout(initWhitelist(), "Whitelist init")
     .catch((e) => logger.warn("Whitelist init failed:", e))
     .finally(() => updateProgress(3, Date.now() - t2));
-  const breachP = initBreachCache()
+  const breachP = withStepTimeout(initBreachCache(), "Breach init")
     .catch((e) => logger.warn("Breach init failed:", e))
     .finally(() => updateProgress(4, Date.now() - t2));
 
@@ -380,6 +423,11 @@ chrome.runtime.onInstalled.addListener(() => {
   scheduleListUpdates();
   fetchRemoteBlocklist();
 
+  // Sag tik menusu — ayar acikken (default) link/sayfa/secime "Alparslan
+  // ile Guvenligi Kontrol Et" secenegi gosterir. Toggle anlik etki etsin
+  // diye applyContextMenu() helper'i settings degisikliginde de cagrilir.
+  applyContextMenuFromSettings();
+
   // Load built-in breach database
   fetch(chrome.runtime.getURL("lists/breached-sites.json"))
     .then((r) => r.json())
@@ -426,6 +474,126 @@ function isFromExtensionPage(sender: chrome.runtime.MessageSender): boolean {
   const ownOrigin = `chrome-extension://${chrome.runtime.id}/`;
   return sender.url?.startsWith(ownOrigin) ?? false;
 }
+
+/**
+ * Sag tik menu click handler — TOP-LEVEL'da kayitli, MV3 SW idle restart'ina
+ * dayanir (onInstalled icine alirsa restart sonrasi dinlemez). info.linkUrl
+ * varsa onu kullanir; yoksa secili metin URL formatindaysa onu; en son
+ * sayfanin kendi URL'sini. evaluateTab() ile whitelist + USOM-confirmed
+ * kontrole sokar, sonucu hem chrome.notifications OS-level toast olarak
+ * hem de popup local notifications storage'a yazar (bell badge artar).
+ */
+// Modern, sade gorunumlu dolgu dair ikonlar — eski beyaz-cerceveli ✅/🚨/⚠️
+// emoji'lerinden ferah ve net. Yesil/kirmizi/turuncu/gri durum kodlamasi
+// dosyanin geri kalanindaki accent renklere de uyumlu.
+const VERDICT_LABEL_MAP: Record<ThreatLevel, { word: string; icon: string }> = {
+  [ThreatLevel.SAFE]: { word: "Güvenli Adres", icon: "🟢" },
+  [ThreatLevel.DANGEROUS]: { word: "Tehlikeli Adres", icon: "🔴" },
+  [ThreatLevel.SUSPICIOUS]: { word: "Şüpheli Adres", icon: "🟠" },
+  [ThreatLevel.UNKNOWN]: { word: "Bilinmeyen Adres", icon: "⚪" },
+};
+
+/**
+ * Teknik gerekce (USOM, homoglyph, IP, .tk vs.) → teknik bilgisi olmayan
+ * kullanicinin anlayacagi sade cumlelere cevirir. Cogul gerekce varsa
+ * benzer kategoriler birlestirilir, tekrar gozukmesin.
+ */
+function buildFriendlyToastReason(level: ThreatLevel, reasons: string[]): string {
+  if (level === ThreatLevel.SAFE) {
+    if (reasons.includes(t.reasons.whitelisted)) {
+      return "Bu adresi güvenli bağlantılarınız arasına eklemiştiniz.";
+    }
+    return "Herhangi bir tehdit veya risk tespit edilmedi. Güvenle gezinebilirsiniz.";
+  }
+
+  if (level === ThreatLevel.DANGEROUS) {
+    return "Doğrulanmış dolandırıcılık veya zararlı yazılım riski içeriyor.";
+  }
+
+  if (level === ThreatLevel.UNKNOWN) {
+    if (reasons.includes(t.reasons.invalidUrl)) {
+      return "Adres yapısı tam olarak çözümlenemedi. Lütfen girmeden önce linki kontrol edin.";
+    }
+    return "Bu adres hakkında elimizde bilgi yok ama her ihtimale karşı tetikteyiz.";
+  }
+
+  // SUSPICIOUS — teknik reason'lari sade Turkce cumlelere cevir.
+  const out = new Set<string>();
+  for (const reason of reasons) {
+    if (reason.includes("alt alan adında güvenilir") || reason.includes("alt alan adında benzer")) {
+      out.add("Güvenilir bir sitenin adresinde gizleniyor olabilir.");
+    } else if (reason.includes("güvenilir ismi içeriyor")) {
+      out.add("Güvenilir bir sitenin adını kullanıyor olabilir.");
+    } else if (reason.includes("farklı uzantı")) {
+      out.add("Tanınmış bir sitenin farklı bir uzantısını kullanıyor.");
+    } else if (reason.includes("benzer domain")) {
+      out.add("Popüler ve güvenli bir siteyi taklit ediyor olabilir.");
+    } else if (reason.includes("anahtar kelime")) {
+      out.add("Şifre veya kimlik bilgisi isteyen sahte sayfalarda sık görülen kelimeler içeriyor.");
+    } else if (reason.includes("IP adresi")) {
+      out.add("Adres bir isim yerine ham sayılarla açılıyor; dolandırıcılarda yaygındır.");
+    } else if (reason.includes("Çok fazla alt alan")) {
+      out.add("Adres olağandışı şekilde uzun ve karmaşık.");
+    } else if (reason.includes("Riskli uzantı")) {
+      out.add("Dolandırıcıların sık kullandığı bir adres uzantısı.");
+    } else if (reason.includes("sahte Unicode")) {
+      out.add("Adreste göze normal görünen ama farklı karakterler var; sahte olabilir.");
+    }
+  }
+  if (out.size === 0) {
+    return "Sizi aldatmaya çalışıyor olabilir, dikkatli olun.";
+  }
+  return Array.from(out).join(" ");
+}
+
+chrome.contextMenus.onClicked.addListener((info, _tab) => {
+  if (info.menuItemId !== "alparslan-scan-link") return;
+  const selection = (info.selectionText || "").trim();
+  const targetUrl =
+    info.linkUrl ||
+    (selection && /^https?:\/\//.test(selection) ? selection : "") ||
+    info.pageUrl ||
+    "";
+  if (!targetUrl) return;
+
+  (async () => {
+    try {
+      const result = await evaluateTab(targetUrl);
+      const label = VERDICT_LABEL_MAP[result.level] || VERDICT_LABEL_MAP[ThreatLevel.UNKNOWN];
+      const hostname = (() => {
+        try { return new URL(targetUrl).hostname; } catch { return targetUrl; }
+      })();
+      const friendlyMessage = buildFriendlyToastReason(result.level, result.reasons);
+
+      // 1) OS-level toast (chrome.notifications) — popup kapaliyken bile gozukur.
+      chrome.notifications.create(`alparslan-scan-${Date.now()}`, {
+        type: "basic",
+        iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
+        title: `${label.icon} ${label.word}: ${hostname}`,
+        message: friendlyMessage,
+        priority: result.level === ThreatLevel.DANGEROUS ? 2 : 0,
+      });
+
+      // 2) Popup local notifications storage'a yaz — bell badge artar,
+      //    kullanici daha sonra sonuca tekrar erisebilir.
+      const localNotif = {
+        id: `link-scan-${Date.now()}-${Math.floor(Math.random() * 9000) + 1000}`,
+        body: `${hostname} — ${friendlyMessage}`,
+        icon: label.icon,
+        timestamp: Date.now(),
+      };
+      chrome.storage.local.get(["localNotifications"], (storage) => {
+        const existing = Array.isArray(storage.localNotifications)
+          ? (storage.localNotifications as { id: string; body: string; icon?: string; timestamp: number }[])
+          : [];
+        const updated = [localNotif, ...existing].slice(0, 30);
+        chrome.storage.local.set({ localNotifications: updated });
+      });
+    } catch (err) {
+      logger.warn("Context menu scan error:", err);
+    }
+  })();
+});
 
 chrome.runtime.onMessage.addListener(
   (message: Message, sender, sendResponse) => {
@@ -527,6 +695,11 @@ chrome.runtime.onMessage.addListener(
       // intro-screen activation that doesn't include every boolean) doesn't
       // accidentally drop keys like `speechBubbleEnabled` to undefined.
       state.settings = { ...DEFAULT_SETTINGS, ...newSettings };
+
+      // Sag tik menusu acik/kapali fark ettiyse anlik senkronize et.
+      if (oldSettings.contextMenuEnabled !== state.settings.contextMenuEnabled) {
+        applyContextMenuFromSettings();
+      }
 
       // Update URL cache TTL
       setTtlMinutes(newSettings.urlCacheTtlMinutes);
@@ -783,7 +956,6 @@ chrome.runtime.onMessage.addListener(
           uniqueSafe: uniqueSafeDomains,
           uniqueThreat: uniqueThreatDomains,
           uniqueUnknown: uniqueUnknownDomains,
-          scanOn: freshSettings.networkMonitoringEnabled !== false,
         };
         sendResponse({ dashboard });
       })();

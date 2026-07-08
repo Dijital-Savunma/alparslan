@@ -41,25 +41,42 @@ export function injectThemeStyles(): void {
   --btn-success-border: #86efac;
   --btn-success-text: #16a34a;
 
-  --btn-danger-bg: #fef2f2;
-  --btn-danger-bg-hover: #fee2e2;
-  --btn-danger-border: #fca5a5;
-  --btn-danger-text: #dc2626;
+  /* Tehlikeli — pastel kirmizi + kurumsal kirmizi.
+     Border net kirmizi — kartin sag/sol/alt/ust kenarlari belirgin
+     bir cizgi olarak goze carpar. */
+  --btn-danger-bg: #FFE3E3;
+  --btn-danger-bg-hover: #FFCCCC;
+  --btn-danger-border: #F87171;
+  --btn-danger-text: #C92A2A;
 
-  --btn-info-bg: #eff6ff;
-  --btn-info-bg-hover: #dbeafe;
-  --btn-info-border: #93c5fd;
-  --btn-info-text: #2563eb;
+  /* Info / Bilinmeyen Adresler — acik pastel mavi. Diger butonlari
+     bastirmayacak sekilde, hafif tint. Text yeterince koyu (blue-700)
+     okunaklilik icin. */
+  --btn-info-bg: #EFF6FF;
+  --btn-info-bg-hover: #DBEAFE;
+  --btn-info-border: #93C5FD;
+  --btn-info-text: #1D4ED8;
 
-  --btn-warning-bg: #fef3c7;
-  --btn-warning-bg-hover: #fde68a;
-  --btn-warning-border: #fde68a;
-  --btn-warning-text: #d97706;
+  /* Supheli / warning — turuncu ton. Yalniz SUSPICIOUS speech
+     bubble'da kullanilir (buton yok). Bir tik daha koyu turuncu bg. */
+  --btn-warning-bg: #FED7AA;
+  --btn-warning-bg-hover: #FDBA74;
+  --btn-warning-border: #FB923C;
+  /* Vurgu (domain + verdict keyword) icin — kullanici "tam turuncu"
+     istedi; eski #B54708 amber/kahverengi tona yakindi. #EA580C
+     (Tailwind orange-600) net turuncu ve acik pastel panel uzerinde
+     okunur. */
+  --btn-warning-text: #EA580C;
 
-  --btn-neutral-bg: #e5e7eb;
-  --btn-neutral-bg-hover: #d1d5db;
-  --btn-neutral-border: #9ca3af;
-  --btn-neutral-text: #374151;
+  /* Notr / Kontrol Gecmisi — acik gri + koyu komur.
+     Bir kademe daha net gri; diger iki buton (danger/warning) belirginlestigi
+     icin bunun da paritede yukselmesi lazim. */
+  /* Notr / Bilinmeyen Adresler. bg diger butonlarla ayni yogunluk
+     (info #EFF6FF, danger #FFE3E3 seviyesinde). */
+  --btn-neutral-bg: #F1F3F7;
+  --btn-neutral-bg-hover: #E4E7EC;
+  --btn-neutral-border: #94A3B8;
+  --btn-neutral-text: #475569;
 
   /* Stat-card tints applied only when value > 0. Pastel surfaces with
      matching hairline borders — "antivirus dashboard" feel. */
@@ -77,6 +94,58 @@ export function injectThemeStyles(): void {
      the page surface. */
   --list-surface: #f1f5f9;
   --list-surface-title: #e2e8f0;
+
+  /* STATUS panel bg vs. BUBBLE bg — iki ayri katman.
+     Panel (dis) verdict tonunda HAFIF tint, bubble (ic) daha net renkli.
+     Boylece balon panelden ayirt edilebilir hale gelir; ozellikle karanlik
+     modda "her sey ayni ton" hissi bitmis olur. */
+  --status-safe-panel: rgba(22, 163, 74, 0.10);
+  --status-danger-panel: rgba(220, 38, 38, 0.10);
+  /* Danger paneli (rgba(220, 38, 38, 0.10)) ile GORSEL PARITE:
+     turuncunun ayni hafif pastel tinti — orange-400 %14 opacity.
+     Beyaz zemin uzerinde hafif pembe/pastel turuncu, kirmizi paneliyle
+     ayni yogunluk. */
+  /* Danger paneli (rgba 220,38,38,0.10) ile TAM PARITE — ayni opacity,
+     ayni goze cok az tint hissi. */
+  --status-warning-panel: rgba(251, 146, 60, 0.10);
+  /* Danger paritesi (rgba 220,38,38,0.10) ile ayni yogunluk — slate
+     tint. Solid gri yerine hafif tint: bubble (neredeyse beyaz) ile
+     arasindaki kontrast oranini danger ile paralel yakalar. */
+  --status-unknown-panel: rgba(148, 163, 184, 0.10);
+  --status-disabled-panel: rgba(156, 163, 175, 0.10);
+
+  /* Konusma balonu (bubble) unknown/neutral varyanti icin ozel tokenlar.
+     Diger varyantlar --btn-*-bg / --btn-*-border kullanmaya devam eder.
+     Panel bir tik daha KOYU (yukarida), bubble bir tik daha ACIK — boylece
+     balon paneldan bariz ayrilir. */
+  /* Danger bubble (#FFF0F0) ile parite: panel blended ~#F4F6F8; bubble
+     ~5-7 birim daha acik (slate-50 civari). */
+  --bubble-neutral-bg: #F8FAFC;
+  --bubble-neutral-border: #B4BAC6;
+  /* Danger bubble (#FFF0F0) ile PARITE: neredeyse beyaz, panel'in
+     acik turuncu tintinden ~7 birim acik. Aynical panel/bubble
+     kontrast orani. */
+  --bubble-warning-bg: #FFFBF3;
+  --bubble-danger-bg: #FFF0F0;
+  --bubble-success-bg: #F4FCF7;
+
+  /* Konusma balonundaki Alparslan logosu — cerceve arka plani ve karanlik
+     modda logonun okunabilir kalmasi icin acik zemin. SVG icinde kalkan
+     koyu tonlarda; --surface-card kullanilsa dark modda logo panelle
+     karisiyor. Her modda ayni beyaz zemin. */
+  --logo-frame-bg: #ffffff;
+
+  /* Quick-whitelist (klasik moddaki + Ekle butonu). */
+  --quick-whitelist-bg: #eff6ff;
+  --quick-whitelist-bg-hover: #dbeafe;
+  --quick-whitelist-border: #bfdbfe;
+  --quick-whitelist-border-hover: #60a5fa;
+  --quick-whitelist-text: #2563eb;
+
+  /* Yardim tooltip'i (skor "?" ikonu vs.) — light: BEYAZ zemin + koyu
+     slate text. Karanlik mod overrider'i asagida (orta slate gri zemin). */
+  --tooltip-bg: #ffffff;
+  --tooltip-text: #0f172a;
 
   /* BRAND / SEMANTIC ACCENT TOKENS
      Inline kullanim icin tek kaynak: artik App.tsx / DashboardTab.tsx vb.
@@ -113,29 +182,35 @@ export function injectThemeStyles(): void {
   --scrollbar-thumb: #475569;
   --scrollbar-thumb-hover: #64748b;
 
-  --btn-success-bg: rgba(22, 163, 74, 0.08);
-  --btn-success-bg-hover: rgba(22, 163, 74, 0.18);
-  --btn-success-border: #16a34a;
+  /* Karanlik modda balon bg'leri panelden ayrilsin diye 0.08 → 0.16
+     civari guclendirildi. Boylece balon net bir "widget" olarak durur,
+     panel arka planiyla karismaz. */
+  --btn-success-bg: rgba(22, 163, 74, 0.16);
+  --btn-success-bg-hover: rgba(22, 163, 74, 0.26);
+  --btn-success-border: #22c55e;
   --btn-success-text: #4ade80;
 
-  --btn-danger-bg: rgba(220, 38, 38, 0.08);
-  --btn-danger-bg-hover: rgba(220, 38, 38, 0.18);
-  --btn-danger-border: #dc2626;
+  --btn-danger-bg: rgba(220, 38, 38, 0.16);
+  --btn-danger-bg-hover: rgba(220, 38, 38, 0.26);
+  --btn-danger-border: #ef4444;
   --btn-danger-text: #f87171;
 
-  --btn-info-bg: rgba(37, 99, 235, 0.08);
-  --btn-info-bg-hover: rgba(37, 99, 235, 0.18);
-  --btn-info-border: #2563eb;
+  --btn-info-bg: rgba(37, 99, 235, 0.16);
+  --btn-info-bg-hover: rgba(37, 99, 235, 0.26);
+  --btn-info-border: #3b82f6;
   --btn-info-text: #60a5fa;
 
-  --btn-warning-bg: rgba(217, 119, 6, 0.10);
-  --btn-warning-bg-hover: rgba(217, 119, 6, 0.20);
-  --btn-warning-border: #d97706;
-  --btn-warning-text: #fbbf24;
+  /* Orange-400 (RGB 251, 146, 60) tinti — orange-600 tinti kahverengiye
+     kayiyordu, amber tinti sariya kayiyordu; orange-400 en net turuncu.
+     Text de f97316 (orange-500) — parlak turuncu, koyu zeminde okunur. */
+  --btn-warning-bg: rgba(251, 146, 60, 0.20);
+  --btn-warning-bg-hover: rgba(251, 146, 60, 0.30);
+  --btn-warning-border: #fb923c;
+  --btn-warning-text: #fb923c;
 
-  --btn-neutral-bg: rgba(148, 163, 184, 0.08);
-  --btn-neutral-bg-hover: rgba(148, 163, 184, 0.18);
-  --btn-neutral-border: #475569;
+  --btn-neutral-bg: rgba(148, 163, 184, 0.14);
+  --btn-neutral-bg-hover: rgba(148, 163, 184, 0.24);
+  --btn-neutral-border: #64748b;
   --btn-neutral-text: #cbd5e1;
 
   /* Dark-mode stat tints — low-opacity hue washes over the dark surface so
@@ -151,6 +226,37 @@ export function injectThemeStyles(): void {
 
   --list-surface: #111e36;
   --list-surface-title: #1e293b;
+
+  /* Karanlik modda panel bg ile bubble bg AYNI olmasin diye:
+     panel HAFIF tint, bubble --btn-*-bg (asagida guclendirildi) */
+  --status-safe-panel: rgba(22, 163, 74, 0.04);
+  --status-danger-panel: rgba(220, 38, 38, 0.05);
+  --status-warning-panel: rgba(217, 119, 6, 0.05);
+  --status-unknown-panel: rgba(148, 163, 184, 0.04);
+  --status-disabled-panel: rgba(156, 163, 175, 0.06);
+
+  /* Karanlik modda balon HAFIF acik (paneldan bariz ayrilir), border net. */
+  --bubble-neutral-bg: rgba(148, 163, 184, 0.16);
+  --bubble-neutral-border: rgba(148, 163, 184, 0.42);
+  --bubble-warning-bg: rgba(251, 146, 60, 0.22);
+  --bubble-danger-bg: rgba(220, 38, 38, 0.18);
+  --bubble-success-bg: rgba(22, 163, 74, 0.18);
+
+  /* Karanlik modda logo cercevesi hafif slate gri — bir tik daha
+     koyu ton (kullanicinin "biraz daha gri, cok degil" tercihi). */
+  --logo-frame-bg: #6b7c92;
+
+  /* Quick-whitelist karanlik varyanti — mavi tint, acik metin. */
+  --quick-whitelist-bg: rgba(37, 99, 235, 0.12);
+  --quick-whitelist-bg-hover: rgba(37, 99, 235, 0.22);
+  --quick-whitelist-border: rgba(37, 99, 235, 0.45);
+  --quick-whitelist-border-hover: rgba(96, 165, 250, 0.75);
+  --quick-whitelist-text: #93c5fd;
+
+  /* Karanlik modda tooltip beyaz cok keskin oldugu icin orta slate gri
+     zemin — yumusak, popup temasiyla uyumlu. Text acik kalir. */
+  --tooltip-bg: #475569;
+  --tooltip-text: #f8fafc;
 
   /* Karanlik modda accent'lar AYNI tutuluyor — boylece inline kullanima
      gecirdigimiz hicbir yerde davranis degisikligi olmuyor. Ileride
@@ -170,17 +276,19 @@ export function injectThemeStyles(): void {
 
 body { background: var(--surface); color: var(--text); transition: background 0.18s ease, color 0.18s ease; }
 
-/* Slim, rounded, theme-aware scrollbars (popup body + inner scroll areas) */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* Slim, sade scrollbar — cok ince, seffaf track, gorunmez border.
+   Hover'da hafif koyulaşır. macOS/iOS overlay stilinden ilhamli. */
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  transition: background 0.15s ease;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.55); }
 ::-webkit-scrollbar-corner { background: transparent; }
+/* Icteki thin-scroll siniflari da global stil ile uyumlu — ekstra
+   kural gerekmez. */
 
 /* One-time metallic "light sweep" that plays when the popup opens on the
    Durum tab. A diagonal silver beam travels from top-left to bottom-right,
@@ -228,14 +336,53 @@ body { background: var(--surface); color: var(--text); transition: background 0.
 /* Detay listeleri ("panjur gecisi") — list panel slides+fades in, then each
    row staggers in 25 ms apart up to the 12th, after which rows appear instantly
    (so a 50-item history doesn't take 1.25 s to finish entering). Total entry
-   animation tops out around 0.6 s. */
+   animation tops out around 0.6 s.
+
+   Acilis 0.32s -> 0.42s'e yavaslatildi (zarif his); kapanis icin de ayri bir
+   keyframe (historyPanelLift) eklendi, eskiden component anlik unmount
+   olup "sak" diye kayboluyordu, simdi 0.24s ile yukari hafifce kayip
+   solarak gider. CollapsibleListSection delayed-unmount handle eder. */
 @keyframes historyPanelDrop {
-  0%   { opacity: 0; transform: translateY(-4px); }
+  0%   { opacity: 0; transform: translateY(-6px); }
   100% { opacity: 1; transform: translateY(0); }
 }
+@keyframes historyPanelLift {
+  0%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
 .history-panel-drop {
-  animation: historyPanelDrop 0.32s ease-out;
+  animation: historyPanelDrop 0.55s cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: top;
+}
+.history-panel-lift {
+  animation: historyPanelLift 0.38s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+  transform-origin: top;
+}
+
+/* Zarif "phantom" scrollbar — varsayilan kalin gri thumb yerine ince,
+   yarisaydam, yuvarlatilmis bir thumb. Track tamamen seffaf, koseler
+   yumusak; liste icindeyken arayuze dahil olmus gibi durur. Hover'da
+   bir tik koyulasir ama hala incedir.
+   Sadece .alparslan-thin-scroll class'iyla aktif olur, baska liste/scroll
+   bolgelerine sizmaz. */
+.alparslan-thin-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.alparslan-thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.alparslan-thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+.alparslan-thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.55);
+}
+.alparslan-thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 @keyframes historyRowFade {
   0%   { opacity: 0; transform: translateY(-4px); }
@@ -254,6 +401,22 @@ body { background: var(--surface); color: var(--text); transition: background 0.
 }
 .setting-card-saved { animation: settingSavedPulse 0.6s ease-out; }
 
+/* Status dot icin "kontrol ediliyor" pulse — durum belirsizken kullaniciyi
+   "ekran donmus mu?" endisesinden kurtaracak sade soluk-belirgin nefes
+   alma. Opaklik + hafif scale ile sessiz, gozalici degil. */
+@keyframes loadingPulse {
+  0%   { opacity: 0.55; transform: scale(1); }
+  50%  { opacity: 1;    transform: scale(1.18); }
+  100% { opacity: 0.55; transform: scale(1); }
+}
+
+/* Tab placeholder loader — sekme icerigi yuklenirken (settings null,
+   dashboard null vs.) merkezde donen halka. Tasinabilir border-spinner
+   pattern: ust kenar koyu mavi, diger uc kenar acik mavi. */
+@keyframes tabSpinner {
+  to { transform: rotate(360deg); }
+}
+
 /* HOVER UTILITY: Ayar karti (ve benzer tiklanabilir kartlar) icin
    state-independent hover efekti. Boylece bilesenler onMouseEnter/Leave
    JS handler'lariyla 20+ yerde tekrar etmek zorunda kalmaz. */
@@ -265,32 +428,25 @@ body { background: var(--surface); color: var(--text); transition: background 0.
 }
 .alparslan-setting-card:hover {
   background: var(--surface-card-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10);
+  transform: scale(1.015);
 }
 
-/* Speech-bubble Alparslan logo — one-shot "grow → shake → shrink" reaction
-   on hover. NOT infinite: the animation plays once each time the cursor
-   enters, then settles back to rest scale. */
+/* Speech-bubble Alparslan logo — sade transition, hover'da hicbir
+   animasyon yok. Eskiden wobble (selamlama sallamasi) vardi ama
+   kullanici rahatsiz buldu, kaldirildi. */
 .alparslan-bubble-logo {
   transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.alparslan-bubble-logo:hover {
-  animation: alparslanWobble 0.65s ease-in-out 1;
-}
-@keyframes alparslanWobble {
-  0%   { transform: scale(1)    rotate(0deg); }
-  18%  { transform: scale(1.12) rotate(-8deg); }
-  36%  { transform: scale(1.12) rotate(7deg); }
-  54%  { transform: scale(1.12) rotate(-5deg); }
-  72%  { transform: scale(1.12) rotate(4deg); }
-  85%  { transform: scale(1.08) rotate(0deg); }
-  100% { transform: scale(1)    rotate(0deg); }
+
+/* Drag-rotate — mood animation drag sirasinda duraklar (inline
+   transform JS tarafindan yonetilir). Transition kural olarak
+   inline'a birakilir (drag'de olmaz, mouseup sonrasi momentum bitince
+   spring-back icin gecerli). */
+.alparslan-bubble-logo.dragging {
+  animation: none !important;
 }
 
-/* Mood expressions — looped status-driven animations on the bubble logo. The
-   :hover wobble above overrides these while the cursor is on the logo, then
-   the mood animation resumes when the cursor leaves. */
+/* Mood expressions — looped status-driven animations on the bubble logo. */
 
 /* Safe — gentle nodding "I approve" motion. */
 @keyframes alparslanNod {

@@ -22,7 +22,6 @@ describe("DashboardTab", () => {
       uniqueSafe: 0,
       uniqueThreat: 0,
       uniqueUnknown: 1,
-      scanOn: true,
     },
   };
 
@@ -77,6 +76,8 @@ describe("DashboardTab", () => {
   it("shows loading state initially", () => {
     chrome.runtime.sendMessage = vi.fn() as unknown as typeof chrome.runtime.sendMessage;
     render(<DashboardTab />);
-    expect(screen.getByText(t.loading)).toBeDefined();
+    // Sekme yuklenirken artik TabLoadingPlaceholder ("Skor yukleniyor")
+    // gosteriliyor; eski "Yukleniyor..." metni yerine yeni placeholder.
+    expect(screen.getByText(/Skor yükleniyor/)).toBeDefined();
   });
 });

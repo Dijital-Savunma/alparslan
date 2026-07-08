@@ -24,8 +24,17 @@ const chromeMock = {
       clear: (cb?: () => void) => cb?.(),
     },
     local: {
-      get: (_keys: unknown) => Promise.resolve({}),
-      set: (_items: unknown) => Promise.resolve(),
+      // Hem callback hem promise destekler — gercek chrome.storage.local
+      // API'si gibi. Callback verilirse hemen sync olarak cagrilir, yoksa
+      // resolved promise doner.
+      get: (_keys: unknown, cb?: (result: Record<string, unknown>) => void) => {
+        if (cb) { cb({}); return undefined; }
+        return Promise.resolve({});
+      },
+      set: (_items: unknown, cb?: () => void) => {
+        if (cb) { cb(); return undefined; }
+        return Promise.resolve();
+      },
     },
   },
   alarms: {
@@ -45,6 +54,14 @@ const chromeMock = {
   declarativeNetRequest: {
     updateDynamicRules: () => Promise.resolve(),
     getDynamicRules: () => Promise.resolve([]),
+  },
+  contextMenus: {
+    create: () => {},
+    removeAll: (cb?: () => void) => { cb?.(); },
+    onClicked: { addListener: () => {} },
+  },
+  notifications: {
+    create: () => {},
   },
 };
 

@@ -176,12 +176,32 @@ async function runMigration(): Promise<void> {
 
 // --- Initialization ---
 
+// IDB queries occasionally hang on corrupted databases or stale transactions.
+// SW init must not stall behind that — better to start with empty sets and
+// recover via background migration than to leave the user staring at a
+// frozen "Engellediğim bağlantılar yükleniyor" forever.
+const LIST_LOAD_TIMEOUT_MS = 5000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 export async function initListCache(): Promise<void> {
   if (cacheReady) return;
 
   try {
-    // Load from IndexedDB into memory
-    const [whitelist, blacklist] = await Promise.all([getAllWhitelist(), getAllBlacklist()]);
+    // Load from IndexedDB into memory — with timeout so a stuck IDB
+    // can't freeze SW init.
+    const [whitelist, blacklist] = await withTimeout(
+      Promise.all([getAllWhitelist(), getAllBlacklist()]),
+      LIST_LOAD_TIMEOUT_MS,
+      "IDB list load",
+    );
 
     whitelistSet = new Set(
       whitelist
@@ -193,16 +213,18 @@ export async function initListCache(): Promise<void> {
         .map((e) => normalizeListDomain(e.domain))
         .filter((domain): domain is string => domain !== null && canMatchListDomain(domain)),
     );
-
-    // Run migration if needed (first time after update)
-    await runMigration();
-
-    cacheReady = true;
-    logger.debug(`List cache ready: ${whitelistSet.size} whitelist, ${blacklistSet.size} blacklist`);
   } catch (err) {
-    logger.warn("List cache init failed, using empty sets:", err);
-    cacheReady = true; // Still mark ready so the extension doesn't hang
+    logger.warn("List cache load failed, starting with empty sets:", err);
   }
+
+  // Cache is ready (even if empty) — SW init can proceed. Migration runs
+  // detached: it'll populate the built-in blacklist when it can, but the
+  // user's UI doesn't wait for it. This collapses the long "blacklist
+  // yükleniyor" stall to milliseconds in the common case.
+  cacheReady = true;
+  logger.debug(`List cache ready: ${whitelistSet.size} whitelist, ${blacklistSet.size} blacklist`);
+
+  runMigration().catch((err) => logger.warn("Migration failed:", err));
 }
 
 // --- Reset (for testing) ---

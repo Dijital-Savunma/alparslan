@@ -51,7 +51,6 @@ export interface DashboardData {
     uniqueSafe: number;
     uniqueThreat: number;
     uniqueUnknown: number;
-    scanOn: boolean;
   };
 }
 

@@ -37,7 +37,21 @@ function createWarningBanner(level: string, reason: string): void {
   const shadow = host.attachShadow({ mode: "closed" });
 
   const isDangerous = level === "DANGEROUS";
-  const bgColor = isDangerous ? "#dc2626" : "#d97706";
+  // Popup Şüpheli Durumlar butonuyla birebir uyum:
+  //  - pale orange bg (#FFEBD5)   ← --btn-warning-bg
+  //  - dark orange text (#B54708) ← --btn-warning-text
+  //  - orange accent border/close ← --btn-warning-border (#FB923C)
+  // Dangerous icin ayni pattern — pale kirmizi bg + koyu kirmizi text.
+  // Suspicious banner-popup oranı referans: banner cok soluk pastel,
+  // popup panel da hafif tint. Dangerous ayni oranı yakalasin diye
+  // banner'ı da suspicious yogunluguna cektik (HSL L~90%, S~93%) —
+  // sadece renk (H) degisti: turuncudan kirmiziya.
+  const bgColor = isDangerous ? "#FECECE" : "#FEE8CE";
+  // Text bg'ye gore cok koyu — koyulasan zeminde okunakli. Popup
+  // butonda pale bg oldugu icin #B54708 yetiyor, bannerda daha koyu
+  // bir cikis lazim.
+  const fgColor = isDangerous ? "#5B0F0F" : "#4A1D00";
+  const accentColor = isDangerous ? "#F87171" : "#FB923C";
   const title = isDangerous ? t.banner.dangerous : t.banner.suspicious;
   // Friendly assistant body \u2014 replaces the raw technical reason ("USOM tehdit
   // listesinde" vb.) with a sentence telling the user what to actually do.
@@ -48,12 +62,13 @@ function createWarningBanner(level: string, reason: string): void {
       .banner {
         font-family: system-ui, -apple-system, sans-serif;
         background: ${bgColor};
-        color: white;
+        color: ${fgColor};
         padding: 12px 110px;
         text-align: center;
         position: relative;
         font-size: 14px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        border-bottom: 2px solid ${accentColor};
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         animation: slideDown 0.3s ease-out;
       }
       .banner-titlerow {
@@ -66,9 +81,6 @@ function createWarningBanner(level: string, reason: string): void {
         width: 34px;
         height: 34px;
         flex-shrink: 0;
-        /* Logoyu dogrudan bannerin uzerinde goster — beyaz daire yok, miger
-           ikonun kendi formu okunsun. Inline SVG; width/height surrogate
-           ile kendi viewBox'ina sigar. */
       }
       .banner-logo svg {
         width: 100%;
@@ -76,19 +88,21 @@ function createWarningBanner(level: string, reason: string): void {
         display: block;
       }
       .banner-title { font-weight: 700; font-size: 15px; letter-spacing: 0.2px; }
-      .banner-reason { font-size: 12.5px; opacity: 0.95; margin-top: 4px; line-height: 1.4; max-width: 720px; margin-left: auto; margin-right: auto; }
+      .banner-reason { font-size: 12.5px; opacity: 0.9; margin-top: 4px; line-height: 1.4; max-width: 720px; margin-left: auto; margin-right: auto; }
       .banner-close {
         position: absolute;
         right: 16px;
         top: 50%;
         transform: translateY(-50%);
-        background: rgba(255,255,255,0.2);
-        border: none; color: white;
+        background: rgba(255,255,255,0.6);
+        border: 1px solid ${accentColor};
+        color: ${fgColor};
         padding: 6px 14px; border-radius: 6px;
         cursor: pointer; font-size: 13px; font-family: inherit;
+        font-weight: 600;
         transition: background 0.15s ease;
       }
-      .banner-close:hover { background: rgba(255,255,255,0.32); }
+      .banner-close:hover { background: rgba(255,255,255,0.9); }
       @keyframes slideDown {
         from { transform: translateY(-100%); }
         to { transform: translateY(0); }
@@ -179,12 +193,12 @@ function createBreachInfoBanner(reason: string, domain: string): void {
     ".confirm-backdrop.open .confirm-card { transform: scale(1); }",
     ".confirm-title { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 10px; }",
     ".confirm-body { font-size: 13px; line-height: 1.55; color: #64748b; margin: 0 0 20px; }",
-    ".confirm-actions { display: flex; gap: 8px; }",
-    ".confirm-btn { flex: 1; padding: 10px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }",
-    ".confirm-btn.primary { background: #2563eb; color: #ffffff; border: none; box-shadow: 0 3px 8px rgba(37, 99, 235, 0.30); }",
-    ".confirm-btn.primary:hover { background: #1d4ed8; transform: scale(1.03); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.40); }",
-    ".confirm-btn.muted { background: transparent; color: #64748b; border: 1px solid #cbd5e1; }",
-    ".confirm-btn.muted:hover { background: #f1f5f9; color: #1e293b; border-color: #94a3b8; transform: scale(1.03); }",
+    ".confirm-actions { display: flex; gap: 8px; max-width: 280px; margin: 0 auto; }",
+    ".confirm-btn { flex: 1; padding: 6px 12px; border-radius: 6px; font-size: 10.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }",
+    ".confirm-btn.primary { background: #16a34a; color: #ffffff; border: none; box-shadow: 0 2px 5px rgba(22, 163, 74, 0.30); }",
+    ".confirm-btn.primary:hover { background: #15803d; transform: scale(1.03); box-shadow: 0 3px 8px rgba(22, 163, 74, 0.40); }",
+    ".confirm-btn.muted { background: #ffffff; color: #374151; border: 1px solid #e5e7eb; font-weight: 500; }",
+    ".confirm-btn.muted:hover { background: #f9fafb; border-color: #cbd5e1; transform: scale(1.03); }",
   ].join(" ");
   shadow.appendChild(style);
 

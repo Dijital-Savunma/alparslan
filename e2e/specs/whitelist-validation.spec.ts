@@ -30,7 +30,12 @@ test.describe("Whitelist validation", () => {
       const options = await openOptionsPage(context, extensionId);
       await resetOptionsStorage(options);
 
-      await options.getByRole("textbox").fill(entry.raw);
+      // Default section artik "Genel Ayarlar" — whitelist input'a erisim
+      // icin sidebar'daki "Güvendiğim Bağlantılar" sekmesine gec.
+      await options.getByRole("button", { name: "Güvendiğim Bağlantılar", exact: true }).click();
+      // Sayfada arama + whitelist input dahil birden fazla textbox var;
+      // placeholder ile spesifik hedefle strict-mode'u koru.
+      await options.getByPlaceholder(/istisna|adresini girin|example\.com/i).fill(entry.raw);
       await options.getByRole("button", { name: "Ekle" }).click();
       await expect(
         options.getByText(entry.normalized, { exact: true }),
@@ -48,16 +53,22 @@ test.describe("Whitelist validation", () => {
     extensionId,
   }) => {
     const options = await openOptionsPage(context, extensionId);
-    await expect(
-      options.getByText("Güvendiğiniz bağlantı listesi boş"),
-    ).toBeVisible();
+    await options.getByRole("button", { name: "Güvendiğim Bağlantılar", exact: true }).click();
+    await expect(options.getByText("Liste henüz boş")).toBeVisible();
 
+    const input = options.getByPlaceholder(/istisna|adresini girin|example\.com/i);
+    const ekleBtn = options.getByRole("button", { name: "Ekle" });
     for (const raw of [".com", "com", "com.tr", "co.uk", "", "http://"]) {
-      await options.getByRole("textbox").fill(raw);
-      await options.getByRole("button", { name: "Ekle" }).click();
-      await expect(
-        options.getByText("Güvendiğiniz bağlantı listesi boş"),
-      ).toBeVisible();
+      await input.fill(raw);
+      // Bos veya rejected girisler icin Ekle disabled state'inde kalirsa
+      // dogrudan click yerine assertion; disabled degilse click ile
+      // dogrula ki liste hala bos kalsin.
+      if (await ekleBtn.isDisabled()) {
+        await expect(options.getByText("Liste henüz boş")).toBeVisible();
+        continue;
+      }
+      await ekleBtn.click();
+      await expect(options.getByText("Liste henüz boş")).toBeVisible();
     }
 
     await options.close();

@@ -12,8 +12,16 @@ describe("TabBar", () => {
 
   it("highlights active tab", () => {
     render(<TabBar activeTab="dashboard" onTabChange={() => {}} />);
-    const dashboardTab = screen.getByText("Skor");
-    expect(dashboardTab.closest("button")?.style.borderBottom).toContain("solid");
+    // Aktif pill artik absolute-pozitiflenmis ayri bir eleman (kayan
+    // animasyon icin); butonlar transparent. Aktif olan mavi metin +
+    // font-weight 600, pasif olan muted + 400 ile ayrilir.
+    const dashboardTab = screen.getByText("Skor").closest("button");
+    const statusTab = screen.getByText("Durum").closest("button");
+    expect(dashboardTab?.style.fontWeight).toBe("600");
+    expect(statusTab?.style.fontWeight).toBe("400");
+    // Renk artik theme.ts'deki --accent-info-bright token'indan gelir;
+    // karanlik/aydinlik modda otomatik uyar.
+    expect(dashboardTab?.style.color).toBe("var(--accent-info-bright)");
   });
 
   it("calls onTabChange when clicked", () => {
