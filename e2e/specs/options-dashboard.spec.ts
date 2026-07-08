@@ -15,12 +15,13 @@ test.describe("Options Page — Happy Path", () => {
 
   test("should allow adding to whitelist", async ({ context, extensionId }) => {
     const options = await openOptionsPage(context, extensionId);
-    // Refactor sonrasi "Beyaz Liste" basligi "Güvendiğim Bağlantılar" oldu.
+    // Options default section artik "Genel Ayarlar" — Whitelist heading'ini
+    // gorebilmek icin once sidebar'daki "Güvendiğim Bağlantılar" butonuna
+    // basmamiz gerek (SidebarNavItem = native <button>).
+    await options.getByRole("button", { name: "Güvendiğim Bağlantılar" }).click();
     await expect(
       options.getByRole("heading", { name: "Güvendiğim Bağlantılar" }),
     ).toBeVisible({ timeout: 5000 });
-    // Placeholder eskiden "örnek: example.com" idi, simdi "İstisna
-    // tutulacak web adresini girin...". Regex ile esnek erisim.
     const input = options.getByPlaceholder(/istisna|adresini girin|example\.com/i);
     await expect(input).toBeVisible();
     await input.fill("test-safe-site.com");
@@ -45,11 +46,11 @@ test.describe("Options Page — Happy Path", () => {
 test.describe("Options Page — Negative Scenarios", () => {
   test("negative: should not add empty domain to whitelist", async ({ context, extensionId }) => {
     const options = await openOptionsPage(context, extensionId);
+    // Sidebar sekmesine gec — happy-path testinde de ayni yaklasim.
+    await options.getByRole("button", { name: "Güvendiğim Bağlantılar" }).click();
     await expect(
       options.getByRole("heading", { name: "Güvendiğim Bağlantılar" }),
     ).toBeVisible({ timeout: 5000 });
-    // Refactor sonrasi "Beyaz liste boş" mesaji "Güvendiğiniz bağlantı
-    // listesi boş" olarak yeniden adlandirildi.
     await expect(options.getByText("Güvendiğiniz bağlantı listesi boş")).toBeVisible();
     // Click Ekle with empty input
     await options.getByRole("button", { name: "Ekle" }).click();
