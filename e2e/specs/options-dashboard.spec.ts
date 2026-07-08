@@ -65,9 +65,11 @@ test.describe("Options Page — Negative Scenarios", () => {
     ).toBeVisible({ timeout: 5000 });
     // Refactor sonrasi bos-liste mesaji "Liste henüz boş" oldu.
     await expect(options.getByText("Liste henüz boş")).toBeVisible();
-    // Click Ekle with empty input
-    await options.getByRole("button", { name: "Ekle" }).click();
-    // Liste hala bos olmali
+    // Input bosken Ekle butonu disabled attribute'u alir; playwright'in
+    // click()'i disabled buton'a error firlatir. Assertion olarak
+    // disabled state'i test etmek yeterli — kullanici zaten bu haldeyken
+    // bir sey yazamaz, liste bos kalir.
+    await expect(options.getByRole("button", { name: "Ekle" })).toBeDisabled();
     await expect(options.getByText("Liste henüz boş")).toBeVisible();
     await options.close();
   });
