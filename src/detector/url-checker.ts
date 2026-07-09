@@ -1,8 +1,8 @@
 import { ThreatLevel, type ThreatResult, type ExtensionSettings } from "@/utils/types";
 import { isBlacklisted } from "@/storage/list-cache";
 import { usomBloomTest } from "@/blocklist/usom-updater";
-import { hasDomain } from "@/blocklist/indexeddb-store";
 import { isDynamicWhitelisted, isUgcDomain, getRiskyTld } from "@/blocklist/whitelist-updater";
+import { checkDomain } from "@/api/usom/service";
 import t from "@/i18n/tr";
 import { canonicalizeUrl } from "@/detector/url-canonicalizer";
 
@@ -587,7 +587,7 @@ export function checkUrl(
 }
 
 /**
- * Async version that confirms USOM Bloom filter hits against IndexedDB.
+ * Async version that confirms USOM Bloom filter hits against the USOM API.
  * Use this when you need zero false positives (e.g. before showing a warning).
  */
 export async function checkUrlConfirmed(
@@ -596,15 +596,17 @@ export async function checkUrlConfirmed(
 ): Promise<ThreatResult> {
   const result = checkUrl(url, protectionLevel);
 
-  // If the sync check flagged it as USOM, confirm via IndexedDB
   if (result.level === ThreatLevel.DANGEROUS && result.reasons.includes(t.reasons.usomListed)) {
     const domain = extractDomain(url);
     if (domain) {
       const rootDomain = extractRootDomain(domain);
-      const confirmed = await hasDomain(domain) || await hasDomain(rootDomain);
+      const domainVerdict = await checkDomain(domain);
+      const rootVerdict =
+        rootDomain === domain ? domainVerdict : await checkDomain(rootDomain);
+      const confirmed = domainVerdict.verdict === true || rootVerdict.verdict === true;
+
       if (!confirmed) {
-        // Bloom filter false positive — re-run without USOM flag
-        const filteredReasons = result.reasons.filter((r) => r !== t.reasons.usomListed);
+        const filteredReasons = result.reasons.filter((reason) => reason !== t.reasons.usomListed);
         return {
           ...result,
           level: filteredReasons.length > 0 ? result.level : ThreatLevel.UNKNOWN,
